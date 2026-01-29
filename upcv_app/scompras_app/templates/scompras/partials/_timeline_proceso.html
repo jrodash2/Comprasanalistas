@@ -48,7 +48,7 @@
                     >
                       <span class="badge rounded-circle {{ badge_class }} d-inline-flex align-items-center justify-content-center"
                             style="width: 34px; height: 34px; font-size: 0.9rem;">
-                        {{ forloop.counter }}
+                        {{ paso.numero }}
                       </span>
                     </button>
                   {% else %}
@@ -58,11 +58,11 @@
                       data-bs-toggle="tooltip"
                       title="{{ paso.titulo }}{% if paso.duracion_referencia %} {{ paso.duracion_referencia }}{% endif %}"
                     >
-                      {{ forloop.counter }}
+                      {{ paso.numero }}
                     </span>
                   {% endif %}
                 {% endwith %}
-              {% elif forloop.counter == paso_actual_num %}
+              {% elif paso.numero == paso_actual_num %}
                 {% with badge_class="bg-primary" %}
                   {% if puede_marcar_pasos %}
                     <button
@@ -76,7 +76,7 @@
                     >
                       <span class="badge rounded-circle {{ badge_class }} d-inline-flex align-items-center justify-content-center"
                             style="width: 34px; height: 34px; font-size: 0.9rem;">
-                        {{ forloop.counter }}
+                        {{ paso.numero }}
                       </span>
                     </button>
                   {% else %}
@@ -86,7 +86,7 @@
                       data-bs-toggle="tooltip"
                       title="{{ paso.titulo }}{% if paso.duracion_referencia %} {{ paso.duracion_referencia }}{% endif %}"
                     >
-                      {{ forloop.counter }}
+                      {{ paso.numero }}
                     </span>
                   {% endif %}
                 {% endwith %}
@@ -104,7 +104,7 @@
                     >
                       <span class="badge rounded-circle {{ badge_class }} d-inline-flex align-items-center justify-content-center"
                             style="width: 34px; height: 34px; font-size: 0.9rem;">
-                        {{ forloop.counter }}
+                        {{ paso.numero }}
                       </span>
                     </button>
                   {% else %}
@@ -114,7 +114,7 @@
                       data-bs-toggle="tooltip"
                       title="{{ paso.titulo }}{% if paso.duracion_referencia %} {{ paso.duracion_referencia }}{% endif %}"
                     >
-                      {{ forloop.counter }}
+                      {{ paso.numero }}
                     </span>
                   {% endif %}
                 {% endwith %}

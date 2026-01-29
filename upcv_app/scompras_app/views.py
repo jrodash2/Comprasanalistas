@@ -202,6 +202,9 @@ def construir_estado_pasos(solicitud, pasos_catalogo):
         for estado in estados
     }
 
+def json_forbidden():
+    return JsonResponse({"success": False, "error": "No autorizado"}, status=403)
+
 @login_required
 @admin_only_config
 # Vistas de configuración: solo Administrador/superuser (bloqueo PRESUPUESTO)
@@ -959,13 +962,15 @@ class SolicitudCompraDetailView(DetailView):
             and context['cdps_reservados'].exists()
         )
         context['puede_editar_caracteristica'] = solicitud.estado in ['Creada', 'Finalizada']
+        if es_analista_asignado:
+            context['puede_editar_caracteristica'] = False
         puede_editar_solicitud_ui = True
         puede_finalizar_solicitud_ui = not estado_finalizada and not estado_rechazada
         puede_anular_solicitud_ui = (
             solicitud.estado == 'Creada' or estado_finalizada or estado_rechazada
         )
         puede_imprimir_solicitud_ui = estado_finalizada or estado_rechazada
-        if es_presupuesto_usuario:
+        if es_presupuesto_usuario or es_analista_asignado:
             puede_editar_solicitud_ui = False
             puede_finalizar_solicitud_ui = False
             puede_anular_solicitud_ui = False
@@ -982,7 +987,7 @@ class SolicitudCompraDetailView(DetailView):
         context['paso_actual_num'] = solicitud.paso_actual
         context['analista_asignado'] = solicitud.analista_asignado
         context['es_analista_asignado'] = es_analista_asignado
-        context['puede_ver_timeline'] = es_admin or es_scompras or es_analista_asignado
+        context['puede_ver_timeline'] = es_admin or es_scompras or es_presupuesto_usuario or es_analista_asignado
         context['puede_marcar_pasos'] = es_admin or es_analista_asignado
         context['es_admin_timeline'] = es_admin
         if es_admin:
@@ -997,7 +1002,7 @@ class SolicitudCompraDetailView(DetailView):
 @require_POST
 def asignar_analista_solicitud(request, solicitud_id):
     if not is_admin(request.user):
-        return JsonResponse({"success": False, "error": "No autorizado"}, status=403)
+        return json_forbidden()
 
     solicitud = get_object_or_404(SolicitudCompra, pk=solicitud_id)
     analista_id = request.POST.get('analista_user_id')
@@ -1019,7 +1024,7 @@ def asignar_analista_solicitud(request, solicitud_id):
                 defaults={'completado': False},
             )
         if pasos_catalogo:
-            solicitud.paso_actual = 1
+            solicitud.paso_actual = pasos_catalogo[0].numero
         solicitud.save(update_fields=['analista_asignado', 'fecha_asignacion_analista', 'paso_actual'])
 
     return JsonResponse({"success": True})
@@ -1034,7 +1039,7 @@ def toggle_paso_solicitud(request, solicitud_id, paso_id):
         is_analista(request.user) and solicitud.analista_asignado_id == request.user.id
     )
     if not (es_admin_usuario or es_analista_asignado):
-        return JsonResponse({"success": False, "error": "No autorizado"}, status=403)
+        return json_forbidden()
 
     pasos_catalogo = obtener_pasos_catalogo(solicitud)
     pasos_ids = [paso.id for paso in pasos_catalogo]
@@ -1069,30 +1074,26 @@ def toggle_paso_solicitud(request, solicitud_id, paso_id):
         }
 
         paso_actual_num = None
-        for idx, paso_item in enumerate(pasos_catalogo, start=1):
+        for paso_item in pasos_catalogo:
             estado_item = estados_map.get(paso_item.id)
             if not estado_item or not estado_item.completado:
-                paso_actual_num = idx
+                paso_actual_num = paso_item.numero
                 break
         if paso_actual_num is None and pasos_catalogo:
-            paso_actual_num = len(pasos_catalogo)
+            paso_actual_num = pasos_catalogo[-1].numero
 
         solicitud.paso_actual = paso_actual_num or solicitud.paso_actual
         solicitud.save(update_fields=['paso_actual'])
 
-    resumen = []
-    for idx, paso_item in enumerate(pasos_catalogo, start=1):
-        estado_item = estados_map.get(paso_item.id)
-        resumen.append({
-            'id': paso_item.id,
-            'numero': idx,
-            'completado': bool(estado_item and estado_item.completado),
-        })
+    completados = [
+        paso_id for paso_id, estado_item in estados_map.items()
+        if estado_item and estado_item.completado
+    ]
 
     return JsonResponse({
         "success": True,
         "paso_actual": solicitud.paso_actual,
-        "pasos": resumen,
+        "completados": completados,
     })
 
 
@@ -1105,7 +1106,7 @@ def set_paso_actual_solicitud(request, solicitud_id):
         is_analista(request.user) and solicitud.analista_asignado_id == request.user.id
     )
     if not (es_admin_usuario or es_analista_asignado):
-        return JsonResponse({"success": False, "error": "No autorizado"}, status=403)
+        return json_forbidden()
 
     pasos_catalogo = obtener_pasos_catalogo(solicitud)
     if not pasos_catalogo:
@@ -1116,7 +1117,8 @@ def set_paso_actual_solicitud(request, solicitud_id):
     except (TypeError, ValueError):
         return JsonResponse({"success": False, "error": "Paso inválido"}, status=400)
 
-    if nuevo_paso < 1 or nuevo_paso > len(pasos_catalogo):
+    numeros_validos = [paso.numero for paso in pasos_catalogo]
+    if nuevo_paso not in numeros_validos:
         return JsonResponse({"success": False, "error": "Paso fuera de rango"}, status=400)
 
     solicitud.paso_actual = nuevo_paso
@@ -1152,7 +1154,7 @@ def bandeja_analista(request):
         solicitudes = solicitudes.filter(tipo_proceso=filtro_tipo)
 
     solicitudes = solicitudes.order_by('-fecha_asignacion_analista', '-id')
-    paginator = Paginator(solicitudes, 10)
+    paginator = Paginator(solicitudes, 15)
     page_number = request.GET.get('page')
     solicitudes_paginadas = paginator.get_page(page_number)
 
@@ -1167,6 +1169,18 @@ def bandeja_analista(request):
         'estados': SolicitudCompra.ESTADOS,
     }
     return render(request, 'scompras/analista_bandeja.html', context)
+
+
+@login_required
+def post_login_redirect(request):
+    user = request.user
+    if is_analista(user):
+        return redirect('scompras:bandeja_analista')
+    if is_admin(user) or is_presupuesto(user):
+        return redirect('scompras:dashboard_admin')
+    if user.groups.filter(name='scompras').exists():
+        return redirect('scompras:dashboard_scompras')
+    return redirect('scompras:home')
 
 
 @login_required
