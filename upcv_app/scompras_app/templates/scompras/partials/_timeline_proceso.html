@@ -22,7 +22,10 @@
           </div>
         </div>
         {% if es_admin_timeline %}
-          <div>
+          <div class="d-flex flex-wrap gap-2">
+            <a class="btn btn-sm btn-outline-secondary" href="{% url 'scompras:procesos_pasos_list' %}">
+              Administrar pasos
+            </a>
             <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalAsignarAnalista">
               Asignar analista
             </button>

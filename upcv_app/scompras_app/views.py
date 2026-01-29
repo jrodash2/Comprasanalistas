@@ -1216,28 +1216,26 @@ def post_login_redirect(request):
 @admin_only_config
 def procesos_pasos_list(request):
     filtro_tipo = request.GET.get('tipo_proceso', '').strip()
-    filtro_activo = request.GET.get('activo', '').strip()
+    filtro_q = request.GET.get('q', '').strip()
 
     pasos = ProcesoCompraPaso.objects.all()
     if filtro_tipo:
         pasos = pasos.filter(tipo_proceso=filtro_tipo)
-    if filtro_activo == 'activos':
-        pasos = pasos.filter(activo=True)
-    elif filtro_activo == 'inactivos':
-        pasos = pasos.filter(activo=False)
+    if filtro_q:
+        pasos = pasos.filter(titulo__icontains=filtro_q)
 
     context = {
         'pasos': pasos.order_by('tipo_proceso', 'numero'),
         'filtro_tipo': filtro_tipo,
-        'filtro_activo': filtro_activo,
+        'filtro_q': filtro_q,
         'tipos_proceso': SolicitudCompra.TIPO_PROCESO_CHOICES,
     }
-    return render(request, 'scompras/admin_procesos/procesos_pasos_list.html', context)
+    return render(request, 'scompras/procesos/pasos_list.html', context)
 
 
 @login_required
 @admin_only_config
-def procesos_pasos_create(request):
+def proceso_paso_create(request):
     if request.method == 'POST':
         form = ProcesoCompraPasoForm(request.POST)
         if form.is_valid():
@@ -1247,7 +1245,7 @@ def procesos_pasos_create(request):
     else:
         form = ProcesoCompraPasoForm()
 
-    return render(request, 'scompras/admin_procesos/procesos_pasos_form.html', {
+    return render(request, 'scompras/procesos/paso_form.html', {
         'form': form,
         'titulo': 'Nuevo paso de proceso',
     })
@@ -1255,7 +1253,7 @@ def procesos_pasos_create(request):
 
 @login_required
 @admin_only_config
-def procesos_pasos_edit(request, pk):
+def proceso_paso_update(request, pk):
     paso = get_object_or_404(ProcesoCompraPaso, pk=pk)
     if request.method == 'POST':
         form = ProcesoCompraPasoForm(request.POST, instance=paso)
@@ -1266,7 +1264,7 @@ def procesos_pasos_edit(request, pk):
     else:
         form = ProcesoCompraPasoForm(instance=paso)
 
-    return render(request, 'scompras/admin_procesos/procesos_pasos_form.html', {
+    return render(request, 'scompras/procesos/paso_form.html', {
         'form': form,
         'titulo': 'Editar paso de proceso',
     })
@@ -1275,13 +1273,13 @@ def procesos_pasos_edit(request, pk):
 @login_required
 @admin_only_config
 @require_POST
-def procesos_pasos_toggle(request, pk):
+def proceso_paso_toggle_activo(request, pk):
+    if not is_admin(request.user):
+        return json_forbidden()
     paso = get_object_or_404(ProcesoCompraPaso, pk=pk)
     paso.activo = not paso.activo
     paso.save(update_fields=['activo'])
-    estado = 'activado' if paso.activo else 'desactivado'
-    messages.success(request, f'Paso {estado} correctamente.')
-    return redirect('scompras:procesos_pasos_list')
+    return JsonResponse({"success": True, "activo": paso.activo})
 
 
 @login_required
