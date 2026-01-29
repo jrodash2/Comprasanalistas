@@ -1,0 +1,104 @@
+{% extends 'scompras/base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container-fluid">
+  <div class="row justify-content-center">
+    <div class="col-12 col-xl-11 col-xxl-10">
+      <div class="card">
+        <div class="card-body">
+          <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <h4 class="mb-0">Procesos de compra</h4>
+            <a class="btn btn-primary btn-sm" href="{% url 'scompras:lista_tipos_proceso' %}">Administrar tipos</a>
+          </div>
+
+          <div class="table-responsive">
+            <table class="table table-striped align-middle">
+              <thead>
+                <tr>
+                  <th>Tipo</th>
+                  <th># Paso</th>
+                  <th>Título</th>
+                  <th>Duración</th>
+                  <th>Activo</th>
+                  <th class="text-end">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for paso in pasos %}
+                  <tr>
+                    <td>{{ paso.tipo_proceso.nombre }}</td>
+                    <td>{{ paso.numero }}</td>
+                    <td>{{ paso.titulo }}</td>
+                    <td>{{ paso.duracion_referencia|default:"—" }}</td>
+                    <td>
+                      {% if paso.activo %}
+                        <span class="badge bg-success">Activo</span>
+                      {% else %}
+                        <span class="badge bg-secondary">Inactivo</span>
+                      {% endif %}
+                    </td>
+                    <td class="text-end">
+                      <a class="btn btn-sm btn-outline-primary" href="{% url 'scompras:editar_paso_tipo_proceso' paso.id %}">Editar</a>
+                      <button class="btn btn-sm btn-outline-secondary btn-toggle-estado" data-id="{{ paso.id }}" type="button">
+                        {% if paso.activo %}Desactivar{% else %}Activar{% endif %}
+                      </button>
+                    </td>
+                  </tr>
+                {% empty %}
+                  <tr>
+                    <td colspan="6" class="text-center text-muted">No hay pasos configurados.</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  (function () {
+    function getCookie(name) {
+      let cookieValue = null;
+      if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let cookie of cookies) {
+          cookie = cookie.trim();
+          if (cookie.startsWith(name + '=')) {
+            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+            break;
+          }
+        }
+      }
+      return cookieValue;
+    }
+    const csrftoken = getCookie('csrftoken');
+    document.querySelectorAll('.btn-toggle-estado').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const pasoId = btn.getAttribute('data-id');
+        fetch(`{% url 'scompras:toggle_activo_paso' 0 %}`.replace('/0/', `/${pasoId}/`), {
+          method: 'POST',
+          headers: {
+            'X-CSRFToken': csrftoken,
+            'X-Requested-With': 'XMLHttpRequest',
+          },
+        })
+          .then((response) => response.json())
+          .then((data) => {
+            if (data.success) {
+              window.location.reload();
+            } else {
+              window.location.reload();
+            }
+          })
+          .catch(() => window.location.reload());
+      });
+    });
+  })();
+</script>
+{% endblock %}

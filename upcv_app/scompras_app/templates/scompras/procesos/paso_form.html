@@ -1,0 +1,65 @@
+{% extends 'scompras/base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container-fluid">
+  <div class="row justify-content-center">
+    <div class="col-12 col-lg-8 col-xl-6">
+      <div class="card">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h4 class="mb-0">{{ titulo }}</h4>
+            <a class="btn btn-outline-secondary btn-sm" href="{{ volver_url }}">Cancelar</a>
+          </div>
+
+          <form method="post">
+            {% csrf_token %}
+            {% if form.non_field_errors %}
+              <div class="alert alert-danger">
+                {{ form.non_field_errors }}
+              </div>
+            {% endif %}
+            {% if ocultar_tipo %}
+              {{ form.tipo_proceso }}
+            {% else %}
+              <div class="mb-3">
+                <label class="form-label">Tipo de proceso</label>
+                {{ form.tipo_proceso }}
+                {% if form.tipo_proceso.errors %}
+                  <div class="text-danger small">{{ form.tipo_proceso.errors }}</div>
+                {% endif %}
+              </div>
+            {% endif %}
+            <div class="mb-3">
+              <label class="form-label">Número</label>
+              {{ form.numero }}
+              {% if form.numero.errors %}
+                <div class="text-danger small">{{ form.numero.errors }}</div>
+              {% endif %}
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Título</label>
+              {{ form.titulo }}
+              {% if form.titulo.errors %}
+                <div class="text-danger small">{{ form.titulo.errors }}</div>
+              {% endif %}
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Duración de referencia</label>
+              {{ form.duracion_referencia }}
+              {% if form.duracion_referencia.errors %}
+                <div class="text-danger small">{{ form.duracion_referencia.errors }}</div>
+              {% endif %}
+            </div>
+            <div class="form-check mb-3">
+              {{ form.activo }}
+              <label class="form-check-label">Activo</label>
+            </div>
+            <button class="btn btn-primary" type="submit">Guardar</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
