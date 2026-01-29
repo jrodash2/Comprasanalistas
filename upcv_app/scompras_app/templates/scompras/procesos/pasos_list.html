@@ -12,6 +12,19 @@
             <a class="btn btn-primary btn-sm" href="{% url 'scompras:proceso_paso_create' %}">+ Crear paso</a>
           </div>
 
+          <div class="alert alert-light border mb-3">
+            Los tipos de proceso son fijos: Baja Cuantía, Compra Directa, Cotización, Contrato Abierto, Licitación.
+            Aquí se administran los pasos por cada tipo.
+          </div>
+
+          <div class="d-flex flex-wrap gap-2 mb-3">
+            <a class="btn btn-outline-secondary btn-sm" href="?tipo_proceso=BAJA_CUANTIA">Ver pasos Baja Cuantía</a>
+            <a class="btn btn-outline-secondary btn-sm" href="?tipo_proceso=COMPRA_DIRECTA">Ver pasos Compra Directa</a>
+            <a class="btn btn-outline-secondary btn-sm" href="?tipo_proceso=COTIZACION">Ver pasos Cotización</a>
+            <a class="btn btn-outline-secondary btn-sm" href="?tipo_proceso=CONTRATO_ABIERTO">Ver pasos Contrato Abierto</a>
+            <a class="btn btn-outline-secondary btn-sm" href="?tipo_proceso=LICITACION">Ver pasos Licitación</a>
+          </div>
+
           <form class="row g-2 align-items-end mb-4" method="get">
             <div class="col-md-4">
               <label class="form-label">Tipo de proceso</label>

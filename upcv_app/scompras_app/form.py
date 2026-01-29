@@ -420,13 +420,15 @@ class SolicitudCompraForm(forms.ModelForm):
     class Meta:
         model = SolicitudCompra
         # En edición no se expone codigo_correlativo para evitar regeneración accidental.
-        fields = ['descripcion', 'producto', 'subproducto', 'prioridad']
+        fields = ['descripcion', 'producto', 'subproducto', 'prioridad', 'tipo_proceso', 'subtipo_baja_cuantia']
         widgets = {
             'descripcion': forms.Textarea(attrs={'class': 'form-control'}),
             'producto': forms.Select(attrs={'class': 'form-control', 'id': 'id_producto'}),
             'subproducto': forms.Select(attrs={'class': 'form-control', 'id': 'id_subproducto'}),
            
             'prioridad': forms.Select(attrs={'class': 'form-control'}),
+            'tipo_proceso': forms.Select(attrs={'class': 'form-control'}),
+            'subtipo_baja_cuantia': forms.Select(attrs={'class': 'form-control'}),
             'fecha_solicitud': forms.DateTimeInput(attrs={'type': 'datetime-local', 'class': 'form-control'}),
         }
 
@@ -434,6 +436,8 @@ class SolicitudCompraForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
       
         self.fields['prioridad'].choices = SolicitudCompra.PRIORIDADES
+        self.fields['tipo_proceso'].choices = SolicitudCompra.TIPO_PROCESO_CHOICES
+        self.fields['subtipo_baja_cuantia'].choices = SolicitudCompra.SUBTIPO_BAJA_CUANTIA_CHOICES
         self.fields['subproducto'].queryset = Subproducto.objects.none()
 
         # Para el autollenado de subproductos según el producto seleccionado
@@ -450,13 +454,15 @@ class SolicitudCompraForm(forms.ModelForm):
 class SolicitudCompraFormcrear(forms.ModelForm):
     class Meta:
         model = SolicitudCompra
-        fields = ['descripcion', 'producto', 'subproducto', 'prioridad']
+        fields = ['descripcion', 'producto', 'subproducto', 'prioridad', 'tipo_proceso', 'subtipo_baja_cuantia']
         widgets = {
             'descripcion': forms.Textarea(attrs={'class': 'form-control'}),
             'producto': forms.Select(attrs={'class': 'form-control', 'id': 'id_producto'}),
             'subproducto': forms.Select(attrs={'class': 'form-control', 'id': 'id_subproducto'}),
             'estado': forms.Select(attrs={'class': 'form-control'}),
             'prioridad': forms.Select(attrs={'class': 'form-control'}),
+            'tipo_proceso': forms.Select(attrs={'class': 'form-control'}),
+            'subtipo_baja_cuantia': forms.Select(attrs={'class': 'form-control'}),
          
         }
 
@@ -464,6 +470,8 @@ class SolicitudCompraFormcrear(forms.ModelForm):
         super().__init__(*args, **kwargs)
        
         self.fields['prioridad'].choices = SolicitudCompra.PRIORIDADES
+        self.fields['tipo_proceso'].choices = SolicitudCompra.TIPO_PROCESO_CHOICES
+        self.fields['subtipo_baja_cuantia'].choices = SolicitudCompra.SUBTIPO_BAJA_CUANTIA_CHOICES
         self.fields['subproducto'].queryset = Subproducto.objects.none()
 
         # Para el autollenado de subproductos según el producto seleccionado

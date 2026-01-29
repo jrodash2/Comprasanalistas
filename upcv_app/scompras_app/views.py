@@ -1857,6 +1857,8 @@ def editar_solicitud(request):
     except SolicitudCompra.DoesNotExist:
         return JsonResponse({'success': False, 'error': 'Solicitud no encontrada.'})
 
+    tipo_anterior = solicitud.tipo_proceso
+    subtipo_anterior = solicitud.subtipo_baja_cuantia
     form = SolicitudCompraForm(request.POST, instance=solicitud)
 
     if form.is_valid():
@@ -1864,7 +1866,41 @@ def editar_solicitud(request):
             solicitud_actualizada = form.save(commit=False)
             # Preservar el correlativo original en edición para evitar regeneración.
             solicitud_actualizada.codigo_correlativo = solicitud.codigo_correlativo
+            if solicitud_actualizada.tipo_proceso != 'BAJA_CUANTIA':
+                solicitud_actualizada.subtipo_baja_cuantia = None
             solicitud_actualizada.save()
+            tipo_cambio = (
+                solicitud_actualizada.tipo_proceso != tipo_anterior
+                or solicitud_actualizada.subtipo_baja_cuantia != subtipo_anterior
+            )
+            if tipo_cambio:
+                pasos_catalogo = obtener_pasos_catalogo(solicitud_actualizada)
+                for paso in pasos_catalogo:
+                    SolicitudPasoEstado.objects.get_or_create(
+                        solicitud=solicitud_actualizada,
+                        paso=paso,
+                        defaults={'completado': False},
+                    )
+                estados = SolicitudPasoEstado.objects.filter(
+                    solicitud=solicitud_actualizada,
+                    paso__in=pasos_catalogo,
+                )
+                hay_completados = estados.filter(completado=True).exists()
+                if pasos_catalogo:
+                    if hay_completados:
+                        paso_actual_num = None
+                        estados_map = {estado.paso_id: estado for estado in estados}
+                        for paso in pasos_catalogo:
+                            estado = estados_map.get(paso.id)
+                            if not estado or not estado.completado:
+                                paso_actual_num = paso.numero
+                                break
+                        if paso_actual_num is None:
+                            paso_actual_num = pasos_catalogo[-1].numero
+                        solicitud_actualizada.paso_actual = paso_actual_num
+                    else:
+                        solicitud_actualizada.paso_actual = pasos_catalogo[0].numero
+                    solicitud_actualizada.save(update_fields=['paso_actual'])
         except IntegrityError:
             return JsonResponse(
                 {'success': False, 'error': 'Ya existe una solicitud con ese correlativo.'}

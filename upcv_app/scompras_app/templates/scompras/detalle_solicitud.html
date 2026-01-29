@@ -691,6 +691,23 @@
   
     <!-- <input type="datetime-local" id="id_fecha_solicitud" name="fecha_solicitud" class="form-control" value="{{ solicitud.fecha_solicitud|date:'Y-m-d\TH:i' }}"> -->
 </div>
+            <div class="col-md-6 mb-3">
+              <label for="id_tipo_proceso" class="form-label fw-semibold">Tipo de proceso:</label>
+              <select id="id_tipo_proceso" name="tipo_proceso" class="form-select">
+                {% for tipo, label in solicitud.TIPO_PROCESO_CHOICES %}
+                  <option value="{{ tipo }}" {% if solicitud.tipo_proceso == tipo %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-6 mb-3" id="subtipoBajaCuantiaGroup">
+              <label for="id_subtipo_baja_cuantia" class="form-label fw-semibold">Subtipo baja cuantía:</label>
+              <select id="id_subtipo_baja_cuantia" name="subtipo_baja_cuantia" class="form-select">
+                <option value="">Seleccione un subtipo</option>
+                {% for subtipo, label in solicitud.SUBTIPO_BAJA_CUANTIA_CHOICES %}
+                  <option value="{{ subtipo }}" {% if solicitud.subtipo_baja_cuantia == subtipo %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
 
             <div class="col-md-12 mb-3">
               <label for="id_descripcion" class="form-label fw-semibold">Justificación:</label>
@@ -1419,6 +1436,27 @@ $('#btnGuardarServicio').on('click', function() {
                 <tr><td colspan="10" class="text-center text-muted">No hay insumos agregados aún.</td></tr>
             `);
         }
+    }
+
+    const tipoProcesoSelect = document.getElementById('id_tipo_proceso');
+    const subtipoBajaCuantiaGroup = document.getElementById('subtipoBajaCuantiaGroup');
+    const subtipoBajaCuantiaSelect = document.getElementById('id_subtipo_baja_cuantia');
+
+    function toggleSubtipoBajaCuantia() {
+        if (!tipoProcesoSelect || !subtipoBajaCuantiaGroup || !subtipoBajaCuantiaSelect) {
+            return;
+        }
+        if (tipoProcesoSelect.value === 'BAJA_CUANTIA') {
+            subtipoBajaCuantiaGroup.style.display = '';
+        } else {
+            subtipoBajaCuantiaGroup.style.display = 'none';
+            subtipoBajaCuantiaSelect.value = '';
+        }
+    }
+
+    if (tipoProcesoSelect) {
+        tipoProcesoSelect.addEventListener('change', toggleSubtipoBajaCuantia);
+        toggleSubtipoBajaCuantia();
     }
 
     const pasoModalElement = document.getElementById('modalPasoProceso');
