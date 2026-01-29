@@ -1,0 +1,344 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Solicitud de Compra</title>
+
+  <style>
+    @page {
+      size: letter;
+      margin: 18px;
+
+      @frame content_frame {
+        left: 18px; right: 18px;
+        top: 18px; bottom: 140px;  /* ✅ reserva espacio para el footer */
+      }
+
+      @frame footer_frame {
+        left: 18px; right: 18px;
+        bottom: 18px;
+        height: 120px;              /* ✅ alto del pie */
+        -pdf-frame-content: footer_content; /* ✅ este ID se renderiza fijo abajo */
+      }
+    }
+
+    body{
+      font-family: Arial, sans-serif;
+      font-size: 11px;
+      margin: 0;
+      color:#111;
+    }
+
+    /* ====== CABECERA ====== */
+    .hdr{
+      width:100%;
+      border-collapse:collapse;
+      margin-bottom:6px;
+    }
+    .hdr td{ vertical-align:middle; padding:0; }
+
+    .logos{
+      width:62%;
+      white-space:nowrap;
+    }
+    .logos img{
+      height:78px;
+      width:auto;
+      margin-right:8px;
+      vertical-align:middle;
+    }
+
+    .titlebox{
+      width:38%;
+      border:1px solid #444;
+      padding:6px 8px;
+      font-size:10px;
+    }
+    .titlebox .t{
+      font-size:12px;
+      font-weight:bold;
+      text-align:center;
+      margin:0 0 4px 0;
+      letter-spacing:.3px;
+    }
+    .titlebox p{ margin:0; line-height:1.25; }
+
+  .info{
+  width:100%;
+  border-collapse:collapse;
+  margin-bottom:10px;
+  table-layout:fixed;
+}
+
+.info td{
+  border:1px solid #444;
+  padding:7px 10px;
+  font-size:10px;
+  line-height:1.35;
+  vertical-align:top;
+}
+
+.info .box-title{
+  display:block;
+  font-weight:bold;
+  font-size:9px;
+  text-transform:uppercase;
+  letter-spacing:.3px;
+  color:#111;
+  margin-bottom:4px;
+  padding:3px 6px;
+  border:1px solid #bbb;
+  background:#f3f3f3;
+}
+
+.info .row{
+  margin:0;
+  padding:0;
+}
+
+.info .label{
+  font-weight:bold;
+  display:inline-block;
+  width:78px;            /* ancho fijo para alinear */
+  color:#222;
+}
+
+.info .value{
+  color:#111;
+}
+
+    .label{ font-weight:bold; display:inline-block; width:74px; }
+
+    /* ====== TEXTO + TABLA ====== */
+    .ptext{
+      margin:0 0 6px;
+      font-size:10px;
+      line-height:1.25;
+    }
+
+    .subtitle{
+      font-size:10px;
+      font-weight:bold;
+      margin:8px 0 4px;
+    }
+.table{
+  width:100%;
+  border-collapse:collapse;
+  table-layout:fixed;
+}
+
+.table th, .table td{
+  border:1px solid #999;
+  padding:4px 5px;
+  font-size:9px;
+  line-height:1.2;
+  vertical-align:top;
+
+  /* ✅ mejor compatibilidad xhtml2pdf */
+  word-wrap: break-word;
+}
+
+/* ===== Anchos POR CLASE (xhtml2pdf los respeta mejor) ===== */
+.w-cant{ width:5%;  }
+.w-reng{ width:5%;  }
+.w-cod { width:9%;  }
+.w-nom { width:12%; }
+.w-car { width:28%; }
+.w-esp { width:10%; }
+.w-pre { width:9%;  }
+.w-cup { width:12%; }
+.w-cop { width:10%; }
+
+    .table th{
+      background:#f2f2f2;
+      text-align:center;
+      font-weight:bold;
+    }
+    .center{ text-align:center; }
+
+    /* ======================================================
+       ✅ FOOTER FIJO (mover imagen con X/Y usando márgenes)
+       ====================================================== */
+    #footer_content{ /* contenedor del pie */ }
+
+    #img-movible{
+      width: 720px;
+      height: auto;
+      margin-left: 35px; /* 👈 X */
+      margin-top: 0px;   /* 👈 Y dentro del footer (0 a ~80 aprox) */
+      display:block;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ====== ENCABEZADO ====== -->
+  <table class="hdr">
+    <tr>
+      <td class="logos">
+        <img src="{{ institucion.logo2.url }}" alt="Logo 2" />
+        <img src="{{ institucion.logo.url }}" alt="Logo 1" />
+      </td>
+      <td>
+        <div class="titlebox">
+          <div class="t">SOLICITUD DE COMPRA</div>
+          <p><strong>Código:</strong> {{ solicitud.codigo_correlativo }}</p>
+          <p><strong>Fecha:</strong> {{ solicitud.fecha_solicitud|date:"d M Y" }}</p>
+        </div>
+      </td>
+    </tr>
+  </table>
+
+<table class="info">
+  <tr>
+    <td width="33%">
+      <span class="box-title">Solicitante</span>
+
+      <div class="row">
+        <span class="label">Solicita:</span>
+        <span class="value">
+          {% if solicitud.seccion and solicitud.seccion.firmante_nombre %}
+            {{ solicitud.seccion.firmante_nombre }}
+          {% else %}
+            Firmante no configurado
+          {% endif %}
+        </span>
+      </div>
+
+      <div class="row">
+        <span class="label">Cargo:</span>
+        <span class="value">
+          {% if solicitud.seccion and solicitud.seccion.firmante_cargo %}
+            {{ solicitud.seccion.firmante_cargo }}
+          {% else %}
+            Cargo no configurado
+          {% endif %}
+        </span>
+      </div>
+    </td>
+
+    <td width="34%">
+  <span class="box-title">Unidad solicitante</span>
+
+  {% if solicitud.seccion.departamento.nombre == solicitud.seccion.nombre %}
+    <div class="row">
+      <span class="label"></span>
+      <span class="value">{{ solicitud.seccion.nombre }}</span>
+    </div>
+  {% else %}
+    <div class="row">
+      <span class="label"></span>
+      <span class="value">{{ solicitud.seccion.departamento.nombre }}</span>
+    </div>
+
+    <div class="row">
+      <span class="label"></span>
+      <span class="value">{{ solicitud.seccion.nombre }}</span>
+    </div>
+  {% endif %}
+</td>
+
+
+    <td width="33%">
+      <span class="box-title">Clasificación presupuestaria</span>
+
+      <div class="row">
+        <span class="label">Producto:</span>
+        <span class="value">{{ solicitud.producto.nombre }}</span>
+      </div>
+
+      <div class="row">
+        <span class="label">Subprod.:</span>
+        <span class="value">{{ solicitud.subproducto.nombre }}</span>
+      </div>
+    </td>
+  </tr>
+</table>
+
+
+  <p class="ptext">
+    Por este medio se solicita al Departamento Administrativo Financiero se sirva efectuar la compra de lo que a continuación se detalla:
+  </p>
+<table class="table">
+  <thead>
+    <tr>
+      <th class="w-cant">Cantidad</th>
+      <th class="w-reng">Renglón</th>
+
+      <th class="w-nom">Nombre</th>
+      <th class="w-car">Características</th>
+      <th class="w-esp">Caract.<br>Especial</th>
+      <th class="w-pre">Presentación</th>
+      <th class="w-cup">Cant. Unidad<br>Presentación</th>
+            <th class="w-cod">Código<br>Insumo</th>
+      <th class="w-cop">Código<br>Presentación</th>
+    </tr>
+  </thead>
+
+<tbody>
+  {# ===== INSUMOS ===== #}
+  {% for detalle in detalles %}
+  <tr>
+    <td class="center w-cant">{{ detalle.cantidad }}</td>
+    <td class="center w-reng">{{ detalle.renglon|default:detalle.insumo.renglon|default:"-" }}</td>
+
+    <td class="w-nom">{{ detalle.insumo.nombre }}</td>
+    <td class="w-car">{{ detalle.insumo.caracteristicas|default:"-" }}</td>
+    <td class="w-esp">{{ detalle.caracteristica_especial|default:"-" }}</td>
+    <td class="center w-pre">{{ detalle.insumo.nombre_presentacion|default:"-" }}</td>
+    <td class="center w-cup">{{ detalle.insumo.cantidad_unidad_presentacion|default:"-" }}</td>
+    <td class="center w-cod">{{ detalle.insumo.codigo_insumo }}</td>
+    <td class="center w-cop">{{ detalle.insumo.codigo_presentacion|default:"-" }}</td>
+  </tr>
+  {% endfor %}
+
+  {# ===== SERVICIOS ===== #}
+  {% for s in servicios %}
+  <tr>
+    <td class="center w-cant">{{ s.cantidad|default:"-" }}</td>
+    <td class="center w-reng">{{ s.servicio.renglon|default:"-" }}</td>
+
+    <td class="w-nom">
+      {% if s.servicio.concepto %}
+        {% for linea in s.servicio.concepto.splitlines %}
+          {% if linea.strip %}{{ linea }}{% if not forloop.last %}<br/>{% endif %}{% endif %}
+        {% endfor %}
+      {% else %}
+        -
+      {% endif %}
+    </td>
+
+    <td class="w-car">-</td>
+    <td class="w-esp">{{ s.caracteristica_especial|default_if_none:s.servicio.caracteristica_especial|default:"-" }}</td>
+    <td class="center w-pre">{{ s.servicio.unidad_medida|default:"-" }}</td>
+    <td class="center w-cup">-</td>
+    <td class="center w-cod">-</td>
+    <td class="center w-cop">-</td>
+  </tr>
+  {% endfor %}
+
+  {# Si no hay nada #}
+  {% if not detalles and not servicios %}
+  <tr>
+    <td colspan="9" class="center">No hay insumos ni servicios agregados.</td>
+  </tr>
+  {% endif %}
+</tbody>
+
+</table>
+<br>
+ <div id="justificacion">
+    <strong>Justificación:</strong> {{ solicitud.descripcion }}
+  </div>
+
+  <!-- ======================================================
+       ✅ FOOTER FIJO ABAJO (NO se mueve con la tabla)
+       ====================================================== -->
+  <div id="footer_content">
+    <img id="img-movible" src="{% static 'assets/images/login/firmas.png' %}" alt="Firmas">
+  </div>
+
+</body>
+</html>
