@@ -1,0 +1,113 @@
+{% extends 'scompras/base.html' %}
+{% load static %}
+
+{% block content %}
+<div style="min-height: calc(100vh - 120px); display:flex; flex-direction:column;">
+  <div style="flex:1;">
+    <div class="container">
+      <div class="row justify-content-center">
+        <div class="col-12 col-lg-10 col-xl-8">
+          <div class="d-flex justify-content-end gap-2 mb-3">
+            <a class="btn btn-outline-primary btn-sm" href="{% url 'scompras:dashboard_analista' %}">Dashboard Analista</a>
+          </div>
+          <div class="card">
+            <div class="card-body">
+              <h4 class="mb-3">Bandeja de Analista</h4>
+
+              <form class="row g-2 align-items-end mb-4" method="get">
+                <div class="col-md-5">
+                  <label class="form-label">Búsqueda</label>
+                  <input type="text" class="form-control" name="q" value="{{ filtros.q }}" placeholder="Correlativo, solicitante o producto">
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label">Estado</label>
+                  <select class="form-select" name="estado">
+                    <option value="">Todos</option>
+                    {% for estado, label in estados %}
+                      <option value="{{ estado }}" {% if filtros.estado == estado %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label">Tipo de proceso</label>
+                  <select class="form-select" name="tipo_proceso">
+                    <option value="">Todos</option>
+                    {% for tipo, label in tipos_proceso %}
+                      <option value="{{ tipo }}" {% if filtros.tipo_proceso == tipo %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="col-md-1 d-grid">
+                  <button class="btn btn-primary" type="submit">Aplicar</button>
+                </div>
+              </form>
+
+              {% if solicitudes %}
+                <div class="table-responsive">
+                  <table class="table table-striped align-middle">
+                    <thead>
+                      <tr>
+                        <th>Correlativo</th>
+                        <th>Fecha solicitud</th>
+                        <th>Sección/Depto</th>
+                        <th>Estado</th>
+                        <th>Tipo proceso</th>
+                        <th>Paso actual</th>
+                        <th>Acción</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for solicitud in solicitudes %}
+                        <tr>
+                          <td>{{ solicitud.codigo_correlativo|default:"—" }}</td>
+                          <td>{{ solicitud.fecha_solicitud|date:"d/m/Y" }}</td>
+                          <td>
+                            {{ solicitud.seccion.nombre }}<br>
+                            <small class="text-muted">{{ solicitud.seccion.departamento.nombre }}</small>
+                          </td>
+                          <td>{{ solicitud.estado }}</td>
+                          <td>{{ solicitud.get_tipo_proceso_display }}</td>
+                          <td>
+                            <span class="badge bg-primary">Paso {{ solicitud.paso_actual }}</span>
+                          </td>
+                          <td>
+                            <a class="btn btn-sm btn-outline-primary" href="{% url 'scompras:detalle_solicitud' solicitud.id %}">
+                              Ver
+                            </a>
+                          </td>
+                        </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+
+                <nav aria-label="Paginación">
+                  <ul class="pagination justify-content-end">
+                    {% if solicitudes.has_previous %}
+                      <li class="page-item">
+                        <a class="page-link" href="?page={{ solicitudes.previous_page_number }}&q={{ filtros.q }}&estado={{ filtros.estado }}&tipo_proceso={{ filtros.tipo_proceso }}">Anterior</a>
+                      </li>
+                    {% else %}
+                      <li class="page-item disabled"><span class="page-link">Anterior</span></li>
+                    {% endif %}
+                    <li class="page-item disabled"><span class="page-link">Página {{ solicitudes.number }} de {{ solicitudes.paginator.num_pages }}</span></li>
+                    {% if solicitudes.has_next %}
+                      <li class="page-item">
+                        <a class="page-link" href="?page={{ solicitudes.next_page_number }}&q={{ filtros.q }}&estado={{ filtros.estado }}&tipo_proceso={{ filtros.tipo_proceso }}">Siguiente</a>
+                      </li>
+                    {% else %}
+                      <li class="page-item disabled"><span class="page-link">Siguiente</span></li>
+                    {% endif %}
+                  </ul>
+                </nav>
+              {% else %}
+                <p class="text-muted mb-0">No tienes solicitudes asignadas.</p>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

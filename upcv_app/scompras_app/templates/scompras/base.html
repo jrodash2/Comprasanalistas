@@ -414,6 +414,20 @@
 
   {% endif %}
 
+  {% if es_analista %}
+    <li class="sidebar-list"><i class="fa fa-thumb-tack"></i>
+      <a class="sidebar-link" href="{% url 'scompras:bandeja_analista' %}">
+        <svg>
+          <use href="../assets/svg/icon-sprite.svg#stroke-home"></use>
+        </svg>
+        <svg class="fill-icon">
+          <use href="../assets/svg/icon-sprite.svg#fill-home"></use>
+        </svg>
+        <span>Bandeja Analista</span>
+      </a>
+    </li>
+  {% endif %}
+
 {% endif %}
 
 
