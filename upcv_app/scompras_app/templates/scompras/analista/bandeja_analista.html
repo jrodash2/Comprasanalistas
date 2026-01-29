@@ -32,8 +32,8 @@
                   <label class="form-label">Tipo de proceso</label>
                   <select class="form-select" name="tipo_proceso">
                     <option value="">Todos</option>
-                    {% for tipo, label in tipos_proceso %}
-                      <option value="{{ tipo }}" {% if filtros.tipo_proceso == tipo %}selected{% endif %}>{{ label }}</option>
+                    {% for tipo in tipos_proceso %}
+                      <option value="{{ tipo.id }}" {% if filtros.tipo_proceso == tipo.id|stringformat:'s' %}selected{% endif %}>{{ tipo.nombre }}</option>
                     {% endfor %}
                   </select>
                 </div>
@@ -66,7 +66,7 @@
                             <small class="text-muted">{{ solicitud.seccion.departamento.nombre }}</small>
                           </td>
                           <td>{{ solicitud.estado }}</td>
-                          <td>{{ solicitud.get_tipo_proceso_display }}</td>
+                          <td>{{ solicitud.tipo_proceso.nombre|default:"—" }}</td>
                           <td>
                             <span class="badge bg-primary">Paso {{ solicitud.paso_actual }}</span>
                           </td>

@@ -7,8 +7,8 @@
         <div>
           <h6 class="mb-1">Proceso de compra</h6>
           <div class="text-muted small">
-            Tipo: {{ solicitud.get_tipo_proceso_display }}
-            {% if solicitud.tipo_proceso == 'BAJA_CUANTIA' and solicitud.subtipo_baja_cuantia %}
+            Tipo: {{ solicitud.tipo_proceso.nombre }}
+            {% if solicitud.tipo_proceso and solicitud.tipo_proceso.codigo == 'baja-cuantia' and solicitud.subtipo_baja_cuantia %}
               · {{ solicitud.get_subtipo_baja_cuantia_display }}
             {% endif %}
           </div>
@@ -23,7 +23,7 @@
         </div>
         {% if es_admin_timeline %}
           <div class="d-flex flex-wrap gap-2">
-            <a class="btn btn-sm btn-outline-secondary" href="{% url 'scompras:procesos_pasos_list' %}">
+            <a class="btn btn-sm btn-outline-secondary" href="{% url 'scompras:lista_tipos_proceso' %}">
               Administrar pasos
             </a>
             <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalAsignarAnalista">

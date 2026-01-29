@@ -53,6 +53,20 @@ class Seccion(models.Model):
 
 
 
+class TipoProcesoCompra(models.Model):
+    nombre = models.CharField(max_length=80, unique=True)
+    codigo = models.SlugField(max_length=40, unique=True)
+    activo = models.BooleanField(default=True)
+    orden = models.PositiveIntegerField(default=0)
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["orden", "nombre"]
+
+    def __str__(self):
+        return self.nombre
+
+
 class SolicitudCompra(models.Model):
     ESTADOS = [
         ('Creada', 'Creada'),
@@ -64,14 +78,6 @@ class SolicitudCompra(models.Model):
         ('Baja', 'Baja'),
         ('Media', 'Media'),
         ('Alta', 'Alta'),
-    ]
-
-    TIPO_PROCESO_CHOICES = [
-        ('BAJA_CUANTIA', 'Baja cuantía'),
-        ('COMPRA_DIRECTA', 'Compra directa'),
-        ('COTIZACION', 'Cotización'),
-        ('CONTRATO_ABIERTO', 'Contrato abierto'),
-        ('LICITACION', 'Licitación'),
     ]
 
     SUBTIPO_BAJA_CUANTIA_CHOICES = [
@@ -96,10 +102,11 @@ class SolicitudCompra(models.Model):
         on_delete=models.SET_NULL,
         related_name="solicitudes_asignadas",
     )
-    tipo_proceso = models.CharField(
-        max_length=30,
-        choices=TIPO_PROCESO_CHOICES,
-        default='COMPRA_DIRECTA',
+    tipo_proceso = models.ForeignKey(
+        'TipoProcesoCompra',
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
     )
     subtipo_baja_cuantia = models.CharField(
         max_length=20,
@@ -124,7 +131,7 @@ class SolicitudCompra(models.Model):
 
 
 class ProcesoCompraPaso(models.Model):
-    tipo_proceso = models.CharField(max_length=30, choices=SolicitudCompra.TIPO_PROCESO_CHOICES)
+    tipo_proceso = models.ForeignKey('TipoProcesoCompra', on_delete=models.CASCADE, related_name="pasos")
     numero = models.PositiveIntegerField()
     titulo = models.CharField(max_length=255)
     duracion_referencia = models.CharField(max_length=80, blank=True)
@@ -135,7 +142,7 @@ class ProcesoCompraPaso(models.Model):
         ordering = ['tipo_proceso', 'numero']
 
     def __str__(self):
-        return f'{self.get_tipo_proceso_display()} - {self.numero}. {self.titulo}'
+        return f'{self.tipo_proceso.nombre} - {self.numero}. {self.titulo}'
 
 
 class SolicitudPasoEstado(models.Model):

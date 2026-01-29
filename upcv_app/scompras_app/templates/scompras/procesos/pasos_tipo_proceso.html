@@ -8,15 +8,20 @@
       <div class="card">
         <div class="card-body">
           <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-            <h4 class="mb-0">Procesos de compra</h4>
-            <a class="btn btn-primary btn-sm" href="{% url 'scompras:lista_tipos_proceso' %}">Administrar tipos</a>
+            <div>
+              <h4 class="mb-1">Pasos de proceso</h4>
+              <div class="text-muted">Tipo: {{ tipo.nombre }}</div>
+            </div>
+            <div class="d-flex gap-2">
+              <a class="btn btn-outline-secondary btn-sm" href="{% url 'scompras:lista_tipos_proceso' %}">Volver</a>
+              <a class="btn btn-primary btn-sm" href="{% url 'scompras:crear_paso_tipo_proceso' tipo.id %}">+ Nuevo paso</a>
+            </div>
           </div>
 
           <div class="table-responsive">
             <table class="table table-striped align-middle">
               <thead>
                 <tr>
-                  <th>Tipo</th>
                   <th># Paso</th>
                   <th>Título</th>
                   <th>Duración</th>
@@ -27,7 +32,6 @@
               <tbody>
                 {% for paso in pasos %}
                   <tr>
-                    <td>{{ paso.tipo_proceso.nombre }}</td>
                     <td>{{ paso.numero }}</td>
                     <td>{{ paso.titulo }}</td>
                     <td>{{ paso.duracion_referencia|default:"—" }}</td>
@@ -47,7 +51,7 @@
                   </tr>
                 {% empty %}
                   <tr>
-                    <td colspan="6" class="text-center text-muted">No hay pasos configurados.</td>
+                    <td colspan="5" class="text-center text-muted">No hay pasos configurados.</td>
                   </tr>
                 {% endfor %}
               </tbody>
@@ -89,13 +93,7 @@
           },
         })
           .then((response) => response.json())
-          .then((data) => {
-            if (data.success) {
-              window.location.reload();
-            } else {
-              window.location.reload();
-            }
-          })
+          .then(() => window.location.reload())
           .catch(() => window.location.reload());
       });
     });

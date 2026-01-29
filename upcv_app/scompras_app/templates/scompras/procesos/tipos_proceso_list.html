@@ -8,52 +8,68 @@
       <div class="card">
         <div class="card-body">
           <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-            <h4 class="mb-0">Procesos de compra</h4>
-            <a class="btn btn-primary btn-sm" href="{% url 'scompras:lista_tipos_proceso' %}">Administrar tipos</a>
+            <h4 class="mb-0">Tipos de proceso</h4>
+            <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalNuevoTipo">+ Nuevo tipo</button>
           </div>
 
           <div class="table-responsive">
             <table class="table table-striped align-middle">
               <thead>
                 <tr>
-                  <th>Tipo</th>
-                  <th># Paso</th>
-                  <th>Título</th>
-                  <th>Duración</th>
+                  <th>Nombre</th>
+                  <th>Código</th>
                   <th>Activo</th>
                   <th class="text-end">Acciones</th>
                 </tr>
               </thead>
               <tbody>
-                {% for paso in pasos %}
+                {% for tipo in tipos %}
                   <tr>
-                    <td>{{ paso.tipo_proceso.nombre }}</td>
-                    <td>{{ paso.numero }}</td>
-                    <td>{{ paso.titulo }}</td>
-                    <td>{{ paso.duracion_referencia|default:"—" }}</td>
+                    <td>{{ tipo.nombre }}</td>
+                    <td>{{ tipo.codigo }}</td>
                     <td>
-                      {% if paso.activo %}
+                      {% if tipo.activo %}
                         <span class="badge bg-success">Activo</span>
                       {% else %}
                         <span class="badge bg-secondary">Inactivo</span>
                       {% endif %}
                     </td>
                     <td class="text-end">
-                      <a class="btn btn-sm btn-outline-primary" href="{% url 'scompras:editar_paso_tipo_proceso' paso.id %}">Editar</a>
-                      <button class="btn btn-sm btn-outline-secondary btn-toggle-estado" data-id="{{ paso.id }}" type="button">
-                        {% if paso.activo %}Desactivar{% else %}Activar{% endif %}
-                      </button>
+                      <a class="btn btn-sm btn-outline-primary" href="{% url 'scompras:pasos_tipo_proceso' tipo.id %}">
+                        Administrar pasos
+                      </a>
                     </td>
                   </tr>
                 {% empty %}
                   <tr>
-                    <td colspan="6" class="text-center text-muted">No hay pasos configurados.</td>
+                    <td colspan="4" class="text-center text-muted">No hay tipos de proceso.</td>
                   </tr>
                 {% endfor %}
               </tbody>
             </table>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modalNuevoTipo" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Nuevo tipo de proceso</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">Nombre</label>
+          <input type="text" class="form-control" id="nuevoTipoNombre" placeholder="Nombre del tipo">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="btnGuardarTipoProceso">Guardar</button>
       </div>
     </div>
   </div>
@@ -78,15 +94,23 @@
       return cookieValue;
     }
     const csrftoken = getCookie('csrftoken');
-    document.querySelectorAll('.btn-toggle-estado').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const pasoId = btn.getAttribute('data-id');
-        fetch(`{% url 'scompras:toggle_activo_paso' 0 %}`.replace('/0/', `/${pasoId}/`), {
+    const btnGuardar = document.getElementById('btnGuardarTipoProceso');
+    const inputNombre = document.getElementById('nuevoTipoNombre');
+
+    if (btnGuardar) {
+      btnGuardar.addEventListener('click', () => {
+        const nombre = inputNombre ? inputNombre.value.trim() : '';
+        if (!nombre) {
+          return;
+        }
+        fetch("{% url 'scompras:crear_tipo_proceso' %}", {
           method: 'POST',
           headers: {
             'X-CSRFToken': csrftoken,
             'X-Requested-With': 'XMLHttpRequest',
+            'Content-Type': 'application/x-www-form-urlencoded',
           },
+          body: new URLSearchParams({ nombre }),
         })
           .then((response) => response.json())
           .then((data) => {
@@ -98,7 +122,7 @@
           })
           .catch(() => window.location.reload());
       });
-    });
+    }
   })();
 </script>
 {% endblock %}

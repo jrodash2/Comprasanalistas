@@ -694,8 +694,11 @@
             <div class="col-md-6 mb-3">
               <label for="id_tipo_proceso" class="form-label fw-semibold">Tipo de proceso:</label>
               <select id="id_tipo_proceso" name="tipo_proceso" class="form-select">
-                {% for tipo, label in solicitud.TIPO_PROCESO_CHOICES %}
-                  <option value="{{ tipo }}" {% if solicitud.tipo_proceso == tipo %}selected{% endif %}>{{ label }}</option>
+                <option value="">Seleccione un tipo</option>
+                {% for tipo in tipos_proceso %}
+                  <option value="{{ tipo.id }}" data-codigo="{{ tipo.codigo }}" {% if solicitud.tipo_proceso_id == tipo.id %}selected{% endif %}>
+                    {{ tipo.nombre }}
+                  </option>
                 {% endfor %}
               </select>
             </div>
@@ -1446,7 +1449,9 @@ $('#btnGuardarServicio').on('click', function() {
         if (!tipoProcesoSelect || !subtipoBajaCuantiaGroup || !subtipoBajaCuantiaSelect) {
             return;
         }
-        if (tipoProcesoSelect.value === 'BAJA_CUANTIA') {
+        const selectedOption = tipoProcesoSelect.options[tipoProcesoSelect.selectedIndex];
+        const codigoSeleccionado = selectedOption ? selectedOption.dataset.codigo : '';
+        if (codigoSeleccionado === 'baja-cuantia') {
             subtipoBajaCuantiaGroup.style.display = '';
         } else {
             subtipoBajaCuantiaGroup.style.display = 'none';

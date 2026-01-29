@@ -20,9 +20,10 @@ from .models import (
     PresupuestoAnual,
     TransferenciaPresupuestaria,
     ProcesoCompraPaso,
+    TipoProcesoCompra,
 )
 
-from django.db.models import Sum, F, Value
+from django.db.models import Sum, F, Value, Q
 from django.db.models.functions import Coalesce
 
 
@@ -436,8 +437,13 @@ class SolicitudCompraForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
       
         self.fields['prioridad'].choices = SolicitudCompra.PRIORIDADES
-        self.fields['tipo_proceso'].choices = SolicitudCompra.TIPO_PROCESO_CHOICES
         self.fields['subtipo_baja_cuantia'].choices = SolicitudCompra.SUBTIPO_BAJA_CUANTIA_CHOICES
+        tipos_qs = TipoProcesoCompra.objects.filter(activo=True).order_by('orden', 'nombre')
+        if self.instance.pk and self.instance.tipo_proceso_id:
+            tipos_qs = TipoProcesoCompra.objects.filter(
+                Q(activo=True) | Q(pk=self.instance.tipo_proceso_id)
+            ).order_by('orden', 'nombre')
+        self.fields['tipo_proceso'].queryset = tipos_qs
         self.fields['subproducto'].queryset = Subproducto.objects.none()
 
         # Para el autollenado de subproductos según el producto seleccionado
@@ -470,8 +476,10 @@ class SolicitudCompraFormcrear(forms.ModelForm):
         super().__init__(*args, **kwargs)
        
         self.fields['prioridad'].choices = SolicitudCompra.PRIORIDADES
-        self.fields['tipo_proceso'].choices = SolicitudCompra.TIPO_PROCESO_CHOICES
         self.fields['subtipo_baja_cuantia'].choices = SolicitudCompra.SUBTIPO_BAJA_CUANTIA_CHOICES
+        self.fields['tipo_proceso'].queryset = TipoProcesoCompra.objects.filter(
+            activo=True
+        ).order_by('orden', 'nombre')
         self.fields['subproducto'].queryset = Subproducto.objects.none()
 
         # Para el autollenado de subproductos según el producto seleccionado

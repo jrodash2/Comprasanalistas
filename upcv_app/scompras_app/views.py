@@ -49,6 +49,7 @@ from .models import (
     SolicitudCompra,
     ProcesoCompraPaso,
     SolicitudPasoEstado,
+    TipoProcesoCompra,
     Subproducto,
     UsuarioDepartamento,
     Institucion,
@@ -111,6 +112,7 @@ import datetime
 from django.core.mail import send_mail
 from django.conf import settings
 from django.utils.html import strip_tags
+from django.utils.text import slugify
 from decimal import Decimal
 from datetime import datetime  
 from openpyxl import Workbook
@@ -175,11 +177,13 @@ BAJA_CUANTIA_PASOS_POR_SUBTIPO = {
 
 
 def obtener_pasos_catalogo(solicitud):
+    if not solicitud.tipo_proceso:
+        return []
     pasos = ProcesoCompraPaso.objects.filter(
         tipo_proceso=solicitud.tipo_proceso,
         activo=True,
     )
-    if solicitud.tipo_proceso == 'BAJA_CUANTIA' and solicitud.subtipo_baja_cuantia:
+    if solicitud.tipo_proceso.codigo == 'baja-cuantia' and solicitud.subtipo_baja_cuantia:
         titulos = BAJA_CUANTIA_PASOS_POR_SUBTIPO.get(solicitud.subtipo_baja_cuantia, [])
         if titulos:
             pasos = pasos.filter(titulo__in=titulos)
@@ -988,9 +992,18 @@ class SolicitudCompraDetailView(DetailView):
         context['paso_actual_num'] = solicitud.paso_actual
         context['analista_asignado'] = solicitud.analista_asignado
         context['es_analista_asignado'] = es_analista_asignado
-        context['puede_ver_timeline'] = es_admin or es_scompras or es_presupuesto_usuario or es_analista_asignado
+        context['puede_ver_timeline'] = (
+            (es_admin or es_scompras or es_presupuesto_usuario or es_analista_asignado)
+            and solicitud.tipo_proceso is not None
+        )
         context['puede_marcar_pasos'] = es_admin or es_analista_asignado
         context['es_admin_timeline'] = es_admin
+        tipos_qs = TipoProcesoCompra.objects.filter(activo=True).order_by('orden', 'nombre')
+        if solicitud.tipo_proceso_id:
+            tipos_qs = TipoProcesoCompra.objects.filter(
+                Q(activo=True) | Q(pk=solicitud.tipo_proceso_id)
+            ).order_by('orden', 'nombre')
+        context['tipos_proceso'] = tipos_qs
         if es_admin:
             context['lista_analistas'] = User.objects.filter(
                 groups__name__iexact='analista'
@@ -1152,7 +1165,7 @@ def bandeja_analista(request):
     if filtro_estado:
         solicitudes = solicitudes.filter(estado=filtro_estado)
     if filtro_tipo:
-        solicitudes = solicitudes.filter(tipo_proceso=filtro_tipo)
+        solicitudes = solicitudes.filter(tipo_proceso_id=filtro_tipo)
 
     solicitudes = solicitudes.order_by('-fecha_asignacion_analista', '-id')
     paginator = Paginator(solicitudes, 15)
@@ -1166,7 +1179,7 @@ def bandeja_analista(request):
             'estado': filtro_estado,
             'tipo_proceso': filtro_tipo,
         },
-        'tipos_proceso': SolicitudCompra.TIPO_PROCESO_CHOICES,
+        'tipos_proceso': TipoProcesoCompra.objects.filter(activo=True).order_by('orden', 'nombre'),
         'estados': SolicitudCompra.ESTADOS,
     }
     return render(request, 'scompras/analista/bandeja_analista.html', context)
@@ -1179,12 +1192,14 @@ def dashboard_analista(request):
 
     solicitudes = SolicitudCompra.objects.filter(analista_asignado=request.user)
     conteo_estado = solicitudes.values('estado').annotate(total=Count('id')).order_by('estado')
-    conteo_tipo = solicitudes.values('tipo_proceso').annotate(total=Count('id')).order_by('tipo_proceso')
-    tipo_label_map = dict(SolicitudCompra.TIPO_PROCESO_CHOICES)
+    conteo_tipo = solicitudes.values(
+        'tipo_proceso__nombre',
+        'tipo_proceso__codigo',
+    ).annotate(total=Count('id')).order_by('tipo_proceso__nombre')
     conteo_tipo_serializado = [
         {
-            'tipo_proceso': item['tipo_proceso'],
-            'label': tipo_label_map.get(item['tipo_proceso'], item['tipo_proceso']),
+            'tipo_proceso': item['tipo_proceso__codigo'] or '',
+            'label': item['tipo_proceso__nombre'] or 'Sin tipo',
             'total': item['total'],
         }
         for item in conteo_tipo
@@ -1214,69 +1229,105 @@ def post_login_redirect(request):
 
 @login_required
 @admin_only_config
-def procesos_pasos_list(request):
-    filtro_tipo = request.GET.get('tipo_proceso', '').strip()
-    filtro_q = request.GET.get('q', '').strip()
+def lista_tipos_proceso(request):
+    tipos = TipoProcesoCompra.objects.all().order_by('orden', 'nombre')
+    return render(request, 'scompras/procesos/tipos_proceso_list.html', {
+        'tipos': tipos,
+    })
 
-    pasos = ProcesoCompraPaso.objects.all()
-    if filtro_tipo:
-        pasos = pasos.filter(tipo_proceso=filtro_tipo)
-    if filtro_q:
-        pasos = pasos.filter(titulo__icontains=filtro_q)
 
-    context = {
-        'pasos': pasos.order_by('tipo_proceso', 'numero'),
-        'filtro_tipo': filtro_tipo,
-        'filtro_q': filtro_q,
-        'tipos_proceso': SolicitudCompra.TIPO_PROCESO_CHOICES,
-    }
-    return render(request, 'scompras/procesos/pasos_list.html', context)
+@login_required
+@require_POST
+def crear_tipo_proceso(request):
+    if not is_admin(request.user):
+        return json_forbidden()
+    nombre = (request.POST.get('nombre') or '').strip()
+    if not nombre:
+        return JsonResponse({'success': False, 'error': 'El nombre es obligatorio.'}, status=400)
+
+    if TipoProcesoCompra.objects.filter(nombre__iexact=nombre).exists():
+        return JsonResponse({'success': False, 'error': 'Ya existe un tipo con ese nombre.'}, status=400)
+
+    base_codigo = slugify(nombre)
+    codigo = base_codigo
+    contador = 1
+    while TipoProcesoCompra.objects.filter(codigo=codigo).exists():
+        contador += 1
+        codigo = f'{base_codigo}-{contador}'
+
+    tipo = TipoProcesoCompra.objects.create(
+        nombre=nombre,
+        codigo=codigo,
+        activo=True,
+    )
+    return JsonResponse({'success': True, 'id': tipo.id, 'nombre': tipo.nombre, 'codigo': tipo.codigo})
 
 
 @login_required
 @admin_only_config
-def proceso_paso_create(request):
-    if request.method == 'POST':
-        form = ProcesoCompraPasoForm(request.POST)
-        if form.is_valid():
-            form.save()
-            messages.success(request, 'Paso creado correctamente.')
-            return redirect('scompras:procesos_pasos_list')
-    else:
-        form = ProcesoCompraPasoForm()
-
-    return render(request, 'scompras/procesos/paso_form.html', {
-        'form': form,
-        'titulo': 'Nuevo paso de proceso',
+def pasos_tipo_proceso(request, tipo_id):
+    tipo = get_object_or_404(TipoProcesoCompra, pk=tipo_id)
+    pasos = tipo.pasos.order_by('numero')
+    return render(request, 'scompras/procesos/pasos_tipo_proceso.html', {
+        'tipo': tipo,
+        'pasos': pasos,
     })
 
 
 @login_required
 @admin_only_config
-def proceso_paso_update(request, pk):
-    paso = get_object_or_404(ProcesoCompraPaso, pk=pk)
+def crear_paso_tipo_proceso(request, tipo_id):
+    tipo = get_object_or_404(TipoProcesoCompra, pk=tipo_id)
     if request.method == 'POST':
-        form = ProcesoCompraPasoForm(request.POST, instance=paso)
+        data = request.POST.copy()
+        data['tipo_proceso'] = tipo.id
+        form = ProcesoCompraPasoForm(data)
         if form.is_valid():
             form.save()
-            messages.success(request, 'Paso actualizado correctamente.')
-            return redirect('scompras:procesos_pasos_list')
+            messages.success(request, 'Paso creado correctamente.')
+            return redirect('scompras:pasos_tipo_proceso', tipo_id=tipo.id)
     else:
-        form = ProcesoCompraPasoForm(instance=paso)
+        form = ProcesoCompraPasoForm(initial={'tipo_proceso': tipo.id})
 
     return render(request, 'scompras/procesos/paso_form.html', {
         'form': form,
+        'tipo': tipo,
+        'titulo': 'Nuevo paso de proceso',
+        'volver_url': reverse('scompras:pasos_tipo_proceso', args=[tipo.id]),
+        'ocultar_tipo': True,
+    })
+
+
+@login_required
+@admin_only_config
+def editar_paso_tipo_proceso(request, paso_id):
+    paso = get_object_or_404(ProcesoCompraPaso, pk=paso_id)
+    if request.method == 'POST':
+        data = request.POST.copy()
+        data['tipo_proceso'] = paso.tipo_proceso_id
+        form = ProcesoCompraPasoForm(data, instance=paso)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Paso actualizado correctamente.')
+            return redirect('scompras:pasos_tipo_proceso', tipo_id=paso.tipo_proceso_id)
+    else:
+        form = ProcesoCompraPasoForm(instance=paso)
+    return render(request, 'scompras/procesos/paso_form.html', {
+        'form': form,
+        'tipo': paso.tipo_proceso,
         'titulo': 'Editar paso de proceso',
+        'volver_url': reverse('scompras:pasos_tipo_proceso', args=[paso.tipo_proceso_id]),
+        'ocultar_tipo': True,
     })
 
 
 @login_required
 @admin_only_config
 @require_POST
-def proceso_paso_toggle_activo(request, pk):
+def toggle_activo_paso(request, paso_id):
     if not is_admin(request.user):
         return json_forbidden()
-    paso = get_object_or_404(ProcesoCompraPaso, pk=pk)
+    paso = get_object_or_404(ProcesoCompraPaso, pk=paso_id)
     paso.activo = not paso.activo
     paso.save(update_fields=['activo'])
     return JsonResponse({"success": True, "activo": paso.activo})
@@ -1866,7 +1917,7 @@ def editar_solicitud(request):
             solicitud_actualizada = form.save(commit=False)
             # Preservar el correlativo original en edición para evitar regeneración.
             solicitud_actualizada.codigo_correlativo = solicitud.codigo_correlativo
-            if solicitud_actualizada.tipo_proceso != 'BAJA_CUANTIA':
+            if solicitud_actualizada.tipo_proceso and solicitud_actualizada.tipo_proceso.codigo != 'baja-cuantia':
                 solicitud_actualizada.subtipo_baja_cuantia = None
             solicitud_actualizada.save()
             tipo_cambio = (
