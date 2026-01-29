@@ -126,6 +126,12 @@
           </td>
         </tr>
 
+        <tr>
+          <td>
+            {% include 'scompras/partials/_timeline_proceso.html' %}
+          </td>
+        </tr>
+
         <!-- Información del solicitante y sección -->
         <tr>
           <td>
@@ -1413,6 +1419,103 @@ $('#btnGuardarServicio').on('click', function() {
                 <tr><td colspan="10" class="text-center text-muted">No hay insumos agregados aún.</td></tr>
             `);
         }
+    }
+
+    const pasoModalElement = document.getElementById('modalPasoProceso');
+    if (pasoModalElement) {
+        const pasoModal = new bootstrap.Modal(pasoModalElement);
+        const pasoTitulo = document.getElementById('modalPasoTitulo');
+        const pasoDescripcion = document.getElementById('modalPasoDescripcion');
+        const pasoNota = document.getElementById('modalPasoNota');
+        const pasoGuardar = document.getElementById('modalPasoGuardar');
+        let pasoSeleccionadoId = null;
+        let pasoSeleccionadoCompleto = false;
+
+        document.querySelectorAll('.paso-timeline-btn').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                pasoSeleccionadoId = btn.getAttribute('data-step-id');
+                pasoSeleccionadoCompleto = btn.getAttribute('data-step-completed') === 'true';
+                const tituloPaso = btn.getAttribute('data-step-title');
+                if (pasoTitulo) {
+                    pasoTitulo.textContent = 'Actualizar paso';
+                }
+                if (pasoDescripcion) {
+                    pasoDescripcion.textContent = tituloPaso;
+                }
+                if (pasoNota) {
+                    pasoNota.value = '';
+                }
+                if (pasoGuardar) {
+                    pasoGuardar.textContent = pasoSeleccionadoCompleto ? 'Desmarcar' : 'Marcar como completado';
+                }
+                pasoModal.show();
+            });
+        });
+
+        if (pasoGuardar) {
+            pasoGuardar.addEventListener('click', () => {
+                if (!pasoSeleccionadoId) {
+                    return;
+                }
+                fetch(
+                    `{% url 'scompras:toggle_paso_solicitud' solicitud.id 0 %}`.replace('/0/', `/${pasoSeleccionadoId}/`),
+                    {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': csrftoken,
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                        },
+                        body: new URLSearchParams({
+                            nota: pasoNota ? pasoNota.value : '',
+                        }),
+                    }
+                )
+                    .then((response) => response.json())
+                    .then((data) => {
+                        if (data.success) {
+                            window.location.reload();
+                        } else {
+                            showModalAlert(data.error || 'No se pudo actualizar el paso.');
+                        }
+                    })
+                    .catch(() => {
+                        showModalAlert('No se pudo actualizar el paso.');
+                    });
+            });
+        }
+    }
+
+    const btnGuardarAnalista = document.getElementById('btnGuardarAnalista');
+    const selectAnalista = document.getElementById('selectAnalista');
+    if (btnGuardarAnalista && selectAnalista) {
+        btnGuardarAnalista.addEventListener('click', () => {
+            const analistaId = selectAnalista.value;
+            if (!analistaId) {
+                showModalAlert('Seleccione un analista.');
+                return;
+            }
+            fetch("{% url 'scompras:asignar_analista_solicitud' solicitud.id %}", {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrftoken,
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    analista_user_id: analistaId,
+                }),
+            })
+                .then((response) => response.json())
+                .then((data) => {
+                    if (data.success) {
+                        window.location.reload();
+                    } else {
+                        showModalAlert(data.error || 'No se pudo asignar el analista.');
+                    }
+                })
+                .catch(() => {
+                    showModalAlert('No se pudo asignar el analista.');
+                });
+        });
     }
 });
 </script>

@@ -182,6 +182,7 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')  # El directorio donde se scomprasa
 MEDIA_SERVER_TICKETS = "http://127.0.0.1:8000"
 
 LOGIN_URL = '/no-autorizado/'  # o una ruta válida a la que redirigir
+LOGIN_REDIRECT_URL = 'scompras:post_login_redirect'
 
 LOGOUT_ON_PASSWORD_CHANGE = True  # si usas algún middleware de seguridad extendido
 
