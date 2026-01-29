@@ -1,0 +1,190 @@
+{% load custom_filters %}
+
+{% if puede_ver_timeline %}
+  <div class="card mb-3">
+    <div class="card-body">
+      <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
+        <div>
+          <h6 class="mb-1">Proceso de compra</h6>
+          <div class="text-muted small">
+            Tipo: {{ solicitud.get_tipo_proceso_display }}
+            {% if solicitud.tipo_proceso == 'BAJA_CUANTIA' and solicitud.subtipo_baja_cuantia %}
+              · {{ solicitud.get_subtipo_baja_cuantia_display }}
+            {% endif %}
+          </div>
+          <div class="text-muted small">
+            Analista:
+            {% if analista_asignado %}
+              {{ analista_asignado.get_full_name|default:analista_asignado.username }}
+            {% else %}
+              Sin asignar
+            {% endif %}
+          </div>
+        </div>
+        {% if es_admin_timeline %}
+          <div>
+            <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalAsignarAnalista">
+              Asignar analista
+            </button>
+          </div>
+        {% endif %}
+      </div>
+
+      {% if pasos_catalogo %}
+        <div class="d-flex flex-wrap gap-2 mt-3">
+          {% for paso in pasos_catalogo %}
+            {% with estado=pasos_estado_map|dict_get:paso.id %}
+              {% if estado and estado.completado %}
+                {% with badge_class="bg-success" %}
+                  {% if puede_marcar_pasos %}
+                    <button
+                      type="button"
+                      class="btn p-0 border-0 bg-transparent paso-timeline-btn"
+                      data-step-id="{{ paso.id }}"
+                      data-step-title="{{ paso.titulo }}"
+                      data-step-completed="true"
+                      data-bs-toggle="tooltip"
+                      title="{{ paso.titulo }}{% if paso.duracion_referencia %} {{ paso.duracion_referencia }}{% endif %}"
+                    >
+                      <span class="badge rounded-circle {{ badge_class }} d-inline-flex align-items-center justify-content-center"
+                            style="width: 34px; height: 34px; font-size: 0.9rem;">
+                        {{ forloop.counter }}
+                      </span>
+                    </button>
+                  {% else %}
+                    <span
+                      class="badge rounded-circle {{ badge_class }} d-inline-flex align-items-center justify-content-center"
+                      style="width: 34px; height: 34px; font-size: 0.9rem;"
+                      data-bs-toggle="tooltip"
+                      title="{{ paso.titulo }}{% if paso.duracion_referencia %} {{ paso.duracion_referencia }}{% endif %}"
+                    >
+                      {{ forloop.counter }}
+                    </span>
+                  {% endif %}
+                {% endwith %}
+              {% elif forloop.counter == paso_actual_num %}
+                {% with badge_class="bg-primary" %}
+                  {% if puede_marcar_pasos %}
+                    <button
+                      type="button"
+                      class="btn p-0 border-0 bg-transparent paso-timeline-btn"
+                      data-step-id="{{ paso.id }}"
+                      data-step-title="{{ paso.titulo }}"
+                      data-step-completed="false"
+                      data-bs-toggle="tooltip"
+                      title="{{ paso.titulo }}{% if paso.duracion_referencia %} {{ paso.duracion_referencia }}{% endif %}"
+                    >
+                      <span class="badge rounded-circle {{ badge_class }} d-inline-flex align-items-center justify-content-center"
+                            style="width: 34px; height: 34px; font-size: 0.9rem;">
+                        {{ forloop.counter }}
+                      </span>
+                    </button>
+                  {% else %}
+                    <span
+                      class="badge rounded-circle {{ badge_class }} d-inline-flex align-items-center justify-content-center"
+                      style="width: 34px; height: 34px; font-size: 0.9rem;"
+                      data-bs-toggle="tooltip"
+                      title="{{ paso.titulo }}{% if paso.duracion_referencia %} {{ paso.duracion_referencia }}{% endif %}"
+                    >
+                      {{ forloop.counter }}
+                    </span>
+                  {% endif %}
+                {% endwith %}
+              {% else %}
+                {% with badge_class="bg-secondary" %}
+                  {% if puede_marcar_pasos %}
+                    <button
+                      type="button"
+                      class="btn p-0 border-0 bg-transparent paso-timeline-btn"
+                      data-step-id="{{ paso.id }}"
+                      data-step-title="{{ paso.titulo }}"
+                      data-step-completed="false"
+                      data-bs-toggle="tooltip"
+                      title="{{ paso.titulo }}{% if paso.duracion_referencia %} {{ paso.duracion_referencia }}{% endif %}"
+                    >
+                      <span class="badge rounded-circle {{ badge_class }} d-inline-flex align-items-center justify-content-center"
+                            style="width: 34px; height: 34px; font-size: 0.9rem;">
+                        {{ forloop.counter }}
+                      </span>
+                    </button>
+                  {% else %}
+                    <span
+                      class="badge rounded-circle {{ badge_class }} d-inline-flex align-items-center justify-content-center"
+                      style="width: 34px; height: 34px; font-size: 0.9rem;"
+                      data-bs-toggle="tooltip"
+                      title="{{ paso.titulo }}{% if paso.duracion_referencia %} {{ paso.duracion_referencia }}{% endif %}"
+                    >
+                      {{ forloop.counter }}
+                    </span>
+                  {% endif %}
+                {% endwith %}
+              {% endif %}
+            {% endwith %}
+          {% endfor %}
+        </div>
+        <div class="d-flex flex-wrap gap-3 mt-3 small text-muted">
+          <div><span class="badge bg-success me-1">&nbsp;</span>Completado</div>
+          <div><span class="badge bg-primary me-1">&nbsp;</span>En curso</div>
+          <div><span class="badge bg-secondary me-1">&nbsp;</span>Pendiente</div>
+        </div>
+      {% else %}
+        <p class="text-muted mb-0">No hay pasos configurados para este proceso.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if puede_marcar_pasos %}
+    <div class="modal fade" id="modalPasoProceso" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="modalPasoTitulo">Actualizar paso</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+          </div>
+          <div class="modal-body">
+            <p class="mb-3" id="modalPasoDescripcion"></p>
+            <div class="mb-3">
+              <label class="form-label">Nota (opcional)</label>
+              <textarea class="form-control" id="modalPasoNota" rows="3" placeholder="Añade una nota para este paso"></textarea>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button type="button" class="btn btn-primary" id="modalPasoGuardar">Guardar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+
+  {% if es_admin_timeline %}
+    <div class="modal fade" id="modalAsignarAnalista" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Asignar analista</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+          </div>
+          <div class="modal-body">
+            <div class="mb-3">
+              <label class="form-label">Analista</label>
+              <select class="form-select" id="selectAnalista">
+                <option value="">Seleccione un analista</option>
+                {% for analista in lista_analistas %}
+                  <option value="{{ analista.id }}"
+                    {% if analista_asignado and analista.id == analista_asignado.id %}selected{% endif %}>
+                    {{ analista.get_full_name|default:analista.username }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button type="button" class="btn btn-primary" id="btnGuardarAnalista">Guardar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+{% endif %}
