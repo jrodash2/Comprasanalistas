@@ -18,6 +18,9 @@ def is_presupuesto(user):
 def es_presupuesto(user):
     return user.is_authenticated and user.groups.filter(name="PRESUPUESTO").exists()
 
+def is_analista(user):
+    return user.is_authenticated and user.groups.filter(name__iexact="analista").exists()
+
 def puede_imprimir_cdp(user):
     return user.is_authenticated and (
         user.groups.filter(name="Administrador").exists()
