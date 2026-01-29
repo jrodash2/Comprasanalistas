@@ -10,6 +10,7 @@ handler403 = 'scompras_app.views.acceso_denegado'  # Asegúrate que el nombre de
 
 urlpatterns = [
     path('', views.home, name='home'), 
+    path('post-login/', views.post_login_redirect, name='post_login_redirect'),
     path('dahsboard/', views.dashboard_admin, name='dahsboard'),  # compatibilidad con ruta previa
     path('signin/', views.signin, name='signin'),
     path('logout/', views.signout, name='logout'),
@@ -25,6 +26,8 @@ urlpatterns = [
     path('dashboard-usuario/', views.dashboard_scompras, name='dashboard_usuario'),
     path('dashboard/admin/', views.dashboard_admin, name='dashboard_admin'),
     path('dashboard/scompras/', views.dashboard_scompras, name='dashboard_scompras'),
+    path('analista/dashboard/', views.dashboard_analista, name='dashboard_analista'),
+    path('analista/bandeja/', views.bandeja_analista, name='bandeja_analista'),
 
     
     
@@ -59,6 +62,13 @@ urlpatterns = [
     path('ajax/cargar-secciones/', views.ajax_cargar_secciones, name='ajax_cargar_secciones'),
     path('ajax/cargar_subproductos/', views.ajax_cargar_subproductos, name='ajax_cargar_subproductos'),
     path('solicitud/<int:pk>/',views.SolicitudCompraDetailView.as_view(), name='detalle_solicitud'),
+    path('solicitud/<int:solicitud_id>/asignar-analista/', views.asignar_analista_solicitud, name='asignar_analista_solicitud'),
+    path('solicitud/<int:solicitud_id>/pasos/<int:paso_id>/toggle/', views.toggle_paso_solicitud, name='toggle_paso_solicitud'),
+    path('solicitud/<int:solicitud_id>/set-paso-actual/', views.set_paso_actual_solicitud, name='set_paso_actual_solicitud'),
+    path('admin/procesos/', views.procesos_pasos_list, name='procesos_pasos_list'),
+    path('admin/procesos/nuevo/', views.proceso_paso_create, name='proceso_paso_create'),
+    path('admin/procesos/<int:pk>/editar/', views.proceso_paso_update, name='proceso_paso_update'),
+    path('admin/procesos/<int:pk>/toggle/', views.proceso_paso_toggle_activo, name='proceso_paso_toggle_activo'),
     path('solicitud/<int:solicitud_id>/cdp/nuevo/', views.crear_cdp_solicitud, name='crear_cdp_solicitud'),
     path('cdp/<int:cdp_id>/ejecutar/', views.ejecutar_cdp, name='ejecutar_cdp'),
     path('cdp/<int:cdp_id>/liberar/', views.liberar_cdp, name='liberar_cdp'),

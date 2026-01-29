@@ -1,0 +1,137 @@
+{% extends 'scompras/base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container-fluid">
+  <div class="row justify-content-center">
+    <div class="col-12 col-xl-11 col-xxl-10">
+      <div class="card">
+        <div class="card-body">
+          <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <h4 class="mb-0">Procesos de compra</h4>
+            <a class="btn btn-primary btn-sm" href="{% url 'scompras:proceso_paso_create' %}">+ Crear paso</a>
+          </div>
+
+          <div class="alert alert-light border mb-3">
+            Los tipos de proceso son fijos: Baja Cuantía, Compra Directa, Cotización, Contrato Abierto, Licitación.
+            Aquí se administran los pasos por cada tipo.
+          </div>
+
+          <div class="d-flex flex-wrap gap-2 mb-3">
+            <a class="btn btn-outline-secondary btn-sm" href="?tipo_proceso=BAJA_CUANTIA">Ver pasos Baja Cuantía</a>
+            <a class="btn btn-outline-secondary btn-sm" href="?tipo_proceso=COMPRA_DIRECTA">Ver pasos Compra Directa</a>
+            <a class="btn btn-outline-secondary btn-sm" href="?tipo_proceso=COTIZACION">Ver pasos Cotización</a>
+            <a class="btn btn-outline-secondary btn-sm" href="?tipo_proceso=CONTRATO_ABIERTO">Ver pasos Contrato Abierto</a>
+            <a class="btn btn-outline-secondary btn-sm" href="?tipo_proceso=LICITACION">Ver pasos Licitación</a>
+          </div>
+
+          <form class="row g-2 align-items-end mb-4" method="get">
+            <div class="col-md-4">
+              <label class="form-label">Tipo de proceso</label>
+              <select class="form-select" name="tipo_proceso">
+                <option value="">Todos</option>
+                {% for tipo, label in tipos_proceso %}
+                  <option value="{{ tipo }}" {% if filtro_tipo == tipo %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-5">
+              <label class="form-label">Buscar por título</label>
+              <input type="text" class="form-control" name="q" value="{{ filtro_q }}" placeholder="Título del paso">
+            </div>
+            <div class="col-md-3 d-grid gap-2">
+              <button class="btn btn-outline-primary" type="submit">Filtrar</button>
+              <a class="btn btn-outline-secondary" href="{% url 'scompras:procesos_pasos_list' %}">Limpiar</a>
+            </div>
+          </form>
+
+          <div class="table-responsive">
+            <table class="table table-striped align-middle">
+              <thead>
+                <tr>
+                  <th>Tipo</th>
+                  <th># Paso</th>
+                  <th>Título</th>
+                  <th>Duración</th>
+                  <th>Activo</th>
+                  <th class="text-end">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for paso in pasos %}
+                  <tr>
+                    <td>{{ paso.get_tipo_proceso_display }}</td>
+                    <td>{{ paso.numero }}</td>
+                    <td>{{ paso.titulo }}</td>
+                    <td>{{ paso.duracion_referencia|default:"—" }}</td>
+                    <td>
+                      {% if paso.activo %}
+                        <span class="badge bg-success">Activo</span>
+                      {% else %}
+                        <span class="badge bg-secondary">Inactivo</span>
+                      {% endif %}
+                    </td>
+                    <td class="text-end">
+                      <a class="btn btn-sm btn-outline-primary" href="{% url 'scompras:proceso_paso_update' paso.id %}">Editar</a>
+                      <button class="btn btn-sm btn-outline-secondary btn-toggle-estado" data-id="{{ paso.id }}" type="button">
+                        {% if paso.activo %}Desactivar{% else %}Activar{% endif %}
+                      </button>
+                    </td>
+                  </tr>
+                {% empty %}
+                  <tr>
+                    <td colspan="6" class="text-center text-muted">No hay pasos configurados.</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  (function () {
+    function getCookie(name) {
+      let cookieValue = null;
+      if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let cookie of cookies) {
+          cookie = cookie.trim();
+          if (cookie.startsWith(name + '=')) {
+            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+            break;
+          }
+        }
+      }
+      return cookieValue;
+    }
+    const csrftoken = getCookie('csrftoken');
+    document.querySelectorAll('.btn-toggle-estado').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const pasoId = btn.getAttribute('data-id');
+        fetch(`{% url 'scompras:proceso_paso_toggle_activo' 0 %}`.replace('/0/', `/${pasoId}/`), {
+          method: 'POST',
+          headers: {
+            'X-CSRFToken': csrftoken,
+            'X-Requested-With': 'XMLHttpRequest',
+          },
+        })
+          .then((response) => response.json())
+          .then((data) => {
+            if (data.success) {
+              window.location.reload();
+            } else {
+              window.location.reload();
+            }
+          })
+          .catch(() => window.location.reload());
+      });
+    });
+  })();
+</script>
+{% endblock %}

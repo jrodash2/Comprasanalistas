@@ -126,6 +126,12 @@
           </td>
         </tr>
 
+        <tr>
+          <td>
+            {% include 'scompras/partials/_timeline_proceso.html' %}
+          </td>
+        </tr>
+
         <!-- Información del solicitante y sección -->
         <tr>
           <td>
@@ -685,6 +691,23 @@
   
     <!-- <input type="datetime-local" id="id_fecha_solicitud" name="fecha_solicitud" class="form-control" value="{{ solicitud.fecha_solicitud|date:'Y-m-d\TH:i' }}"> -->
 </div>
+            <div class="col-md-6 mb-3">
+              <label for="id_tipo_proceso" class="form-label fw-semibold">Tipo de proceso:</label>
+              <select id="id_tipo_proceso" name="tipo_proceso" class="form-select">
+                {% for tipo, label in solicitud.TIPO_PROCESO_CHOICES %}
+                  <option value="{{ tipo }}" {% if solicitud.tipo_proceso == tipo %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-6 mb-3" id="subtipoBajaCuantiaGroup">
+              <label for="id_subtipo_baja_cuantia" class="form-label fw-semibold">Subtipo baja cuantía:</label>
+              <select id="id_subtipo_baja_cuantia" name="subtipo_baja_cuantia" class="form-select">
+                <option value="">Seleccione un subtipo</option>
+                {% for subtipo, label in solicitud.SUBTIPO_BAJA_CUANTIA_CHOICES %}
+                  <option value="{{ subtipo }}" {% if solicitud.subtipo_baja_cuantia == subtipo %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
 
             <div class="col-md-12 mb-3">
               <label for="id_descripcion" class="form-label fw-semibold">Justificación:</label>
@@ -1413,6 +1436,124 @@ $('#btnGuardarServicio').on('click', function() {
                 <tr><td colspan="10" class="text-center text-muted">No hay insumos agregados aún.</td></tr>
             `);
         }
+    }
+
+    const tipoProcesoSelect = document.getElementById('id_tipo_proceso');
+    const subtipoBajaCuantiaGroup = document.getElementById('subtipoBajaCuantiaGroup');
+    const subtipoBajaCuantiaSelect = document.getElementById('id_subtipo_baja_cuantia');
+
+    function toggleSubtipoBajaCuantia() {
+        if (!tipoProcesoSelect || !subtipoBajaCuantiaGroup || !subtipoBajaCuantiaSelect) {
+            return;
+        }
+        if (tipoProcesoSelect.value === 'BAJA_CUANTIA') {
+            subtipoBajaCuantiaGroup.style.display = '';
+        } else {
+            subtipoBajaCuantiaGroup.style.display = 'none';
+            subtipoBajaCuantiaSelect.value = '';
+        }
+    }
+
+    if (tipoProcesoSelect) {
+        tipoProcesoSelect.addEventListener('change', toggleSubtipoBajaCuantia);
+        toggleSubtipoBajaCuantia();
+    }
+
+    const pasoModalElement = document.getElementById('modalPasoProceso');
+    if (pasoModalElement) {
+        const pasoModal = new bootstrap.Modal(pasoModalElement);
+        const pasoTitulo = document.getElementById('modalPasoTitulo');
+        const pasoDescripcion = document.getElementById('modalPasoDescripcion');
+        const pasoNota = document.getElementById('modalPasoNota');
+        const pasoGuardar = document.getElementById('modalPasoGuardar');
+        let pasoSeleccionadoId = null;
+        let pasoSeleccionadoCompleto = false;
+
+        document.querySelectorAll('.paso-timeline-btn').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                pasoSeleccionadoId = btn.getAttribute('data-step-id');
+                pasoSeleccionadoCompleto = btn.getAttribute('data-step-completed') === 'true';
+                const tituloPaso = btn.getAttribute('data-step-title');
+                if (pasoTitulo) {
+                    pasoTitulo.textContent = 'Actualizar paso';
+                }
+                if (pasoDescripcion) {
+                    pasoDescripcion.textContent = tituloPaso;
+                }
+                if (pasoNota) {
+                    pasoNota.value = '';
+                }
+                if (pasoGuardar) {
+                    pasoGuardar.textContent = pasoSeleccionadoCompleto ? 'Desmarcar' : 'Marcar como completado';
+                }
+                pasoModal.show();
+            });
+        });
+
+        if (pasoGuardar) {
+            pasoGuardar.addEventListener('click', () => {
+                if (!pasoSeleccionadoId) {
+                    return;
+                }
+                fetch(
+                    `{% url 'scompras:toggle_paso_solicitud' solicitud.id 0 %}`.replace('/0/', `/${pasoSeleccionadoId}/`),
+                    {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': csrftoken,
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                        },
+                        body: new URLSearchParams({
+                            nota: pasoNota ? pasoNota.value : '',
+                        }),
+                    }
+                )
+                    .then((response) => response.json())
+                    .then((data) => {
+                        if (data.success) {
+                            window.location.reload();
+                        } else {
+                            showModalAlert(data.error || 'No se pudo actualizar el paso.');
+                        }
+                    })
+                    .catch(() => {
+                        showModalAlert('No se pudo actualizar el paso.');
+                    });
+            });
+        }
+    }
+
+    const btnGuardarAnalista = document.getElementById('btnGuardarAnalista');
+    const selectAnalista = document.getElementById('selectAnalista');
+    if (btnGuardarAnalista && selectAnalista) {
+        btnGuardarAnalista.addEventListener('click', () => {
+            const analistaId = selectAnalista.value;
+            if (!analistaId) {
+                showModalAlert('Seleccione un analista.');
+                return;
+            }
+            fetch("{% url 'scompras:asignar_analista_solicitud' solicitud.id %}", {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrftoken,
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    analista_user_id: analistaId,
+                }),
+            })
+                .then((response) => response.json())
+                .then((data) => {
+                    if (data.success) {
+                        window.location.reload();
+                    } else {
+                        showModalAlert(data.error || 'No se pudo asignar el analista.');
+                    }
+                })
+                .catch(() => {
+                    showModalAlert('No se pudo asignar el analista.');
+                });
+        });
     }
 });
 </script>

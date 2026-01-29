@@ -36,6 +36,7 @@ from .form import (
     LiberarCDPForm,
     LiberarCDPSolicitudForm,
     TransferenciaPresupuestariaForm,
+    ProcesoCompraPasoForm,
 )
 from .models import (
     FechaInsumo,
@@ -46,6 +47,8 @@ from .models import (
     Departamento,
     Seccion,
     SolicitudCompra,
+    ProcesoCompraPaso,
+    SolicitudPasoEstado,
     Subproducto,
     UsuarioDepartamento,
     Institucion,
@@ -63,6 +66,7 @@ from django.views.generic import CreateView
 from django.views.generic import ListView
 from django.urls import reverse_lazy
 from django.http import Http404, HttpResponseNotAllowed, JsonResponse
+from django.http import HttpResponseForbidden
 from django.core.exceptions import ValidationError
 from django.contrib import messages
 from django.views.decorators.http import require_POST
@@ -82,6 +86,7 @@ from .utils import (
     es_presupuesto,
     grupo_requerido,
     is_admin,
+    is_analista,
     is_presupuesto,
     puede_imprimir_cdp,
 )
@@ -122,6 +127,7 @@ from xhtml2pdf import pisa
 from io import BytesIO
 from django.contrib.auth.backends import ModelBackend
 from django.db import connections
+from django.core.paginator import Paginator
 
 
 class TicketsAuthBackend(ModelBackend):
@@ -144,6 +150,61 @@ class TicketsAuthBackend(ModelBackend):
             return User.objects.using('tickets_db').get(pk=user_id)
         except User.DoesNotExist:
             return None
+
+
+BAJA_CUANTIA_PASOS_POR_SUBTIPO = {
+    'CHEQUE': [
+        'INGRESO SOLICITUD',
+        'REGISTRO Y REVISIÓN',
+        'COTIZACIÓN / COMPARATIVO',
+        'AUTORIZACIÓN DE COMPRA',
+        'TRÁMITE DE CHEQUE',
+        'ENTREGA DE CHEQUE',
+        'CIERRE DE EXPEDIENTE',
+    ],
+    'ACREDITAMIENTO': [
+        'INGRESO SOLICITUD',
+        'REGISTRO Y REVISIÓN',
+        'COTIZACIÓN / COMPARATIVO',
+        'AUTORIZACIÓN DE COMPRA',
+        'ACREDITAMIENTO A CUENTA',
+        'CONFIRMACIÓN DE PAGO',
+        'CIERRE DE EXPEDIENTE',
+    ],
+}
+
+
+def obtener_pasos_catalogo(solicitud):
+    pasos = ProcesoCompraPaso.objects.filter(
+        tipo_proceso=solicitud.tipo_proceso,
+        activo=True,
+    )
+    if solicitud.tipo_proceso == 'BAJA_CUANTIA' and solicitud.subtipo_baja_cuantia:
+        titulos = BAJA_CUANTIA_PASOS_POR_SUBTIPO.get(solicitud.subtipo_baja_cuantia, [])
+        if titulos:
+            pasos = pasos.filter(titulo__in=titulos)
+            pasos = sorted(pasos, key=lambda paso: titulos.index(paso.titulo))
+            return pasos
+    return list(pasos.order_by('numero'))
+
+
+def construir_estado_pasos(solicitud, pasos_catalogo):
+    estados = SolicitudPasoEstado.objects.filter(
+        solicitud=solicitud,
+        paso__in=pasos_catalogo,
+    ).select_related('completado_por', 'paso')
+    return {
+        estado.paso_id: {
+            'completado': estado.completado,
+            'fecha_completado': estado.fecha_completado,
+            'completado_por': estado.completado_por,
+            'nota': estado.nota,
+        }
+        for estado in estados
+    }
+
+def json_forbidden():
+    return JsonResponse({"success": False, "error": "No autorizado"}, status=403)
 
 @login_required
 @admin_only_config
@@ -807,6 +868,17 @@ class SolicitudCompraDetailView(DetailView):
     template_name = 'scompras/detalle_solicitud.html'
     context_object_name = 'solicitud'
 
+    def dispatch(self, request, *args, **kwargs):
+        solicitud = self.get_object()
+        user = request.user
+        es_scompras = user.groups.filter(name='scompras').exists()
+        es_admin_usuario = is_admin(user) or is_presupuesto(user)
+        es_analista_asignado = (
+            is_analista(user) and solicitud.analista_asignado_id == user.id
+        )
+        if not (es_admin_usuario or es_scompras or es_analista_asignado):
+            return HttpResponseForbidden("No autorizado.")
+        return super().dispatch(request, *args, **kwargs)
 
     
     def get_context_data(self, **kwargs):
@@ -817,6 +889,9 @@ class SolicitudCompraDetailView(DetailView):
         es_admin = is_admin(user)
         es_presupuesto_usuario = es_presupuesto(user)
         es_scompras = user.groups.filter(name='scompras').exists()
+        es_analista_asignado = (
+            is_analista(user) and solicitud.analista_asignado_id == user.id
+        )
         estado_finalizada = solicitud.estado == 'Finalizada'
         estado_rechazada = solicitud.estado == 'Rechazada'
 
@@ -888,13 +963,15 @@ class SolicitudCompraDetailView(DetailView):
             and context['cdps_reservados'].exists()
         )
         context['puede_editar_caracteristica'] = solicitud.estado in ['Creada', 'Finalizada']
+        if es_analista_asignado:
+            context['puede_editar_caracteristica'] = False
         puede_editar_solicitud_ui = True
         puede_finalizar_solicitud_ui = not estado_finalizada and not estado_rechazada
         puede_anular_solicitud_ui = (
             solicitud.estado == 'Creada' or estado_finalizada or estado_rechazada
         )
         puede_imprimir_solicitud_ui = estado_finalizada or estado_rechazada
-        if es_presupuesto_usuario:
+        if es_presupuesto_usuario or es_analista_asignado:
             puede_editar_solicitud_ui = False
             puede_finalizar_solicitud_ui = False
             puede_anular_solicitud_ui = False
@@ -905,8 +982,304 @@ class SolicitudCompraDetailView(DetailView):
         context['puede_finalizar_solicitud_ui'] = puede_finalizar_solicitud_ui
         context['puede_anular_solicitud_ui'] = puede_anular_solicitud_ui
         context['puede_imprimir_solicitud_ui'] = puede_imprimir_solicitud_ui
+        pasos_catalogo = obtener_pasos_catalogo(solicitud)
+        context['pasos_catalogo'] = pasos_catalogo
+        context['pasos_estado_map'] = construir_estado_pasos(solicitud, pasos_catalogo)
+        context['paso_actual_num'] = solicitud.paso_actual
+        context['analista_asignado'] = solicitud.analista_asignado
+        context['es_analista_asignado'] = es_analista_asignado
+        context['puede_ver_timeline'] = es_admin or es_scompras or es_presupuesto_usuario or es_analista_asignado
+        context['puede_marcar_pasos'] = es_admin or es_analista_asignado
+        context['es_admin_timeline'] = es_admin
+        if es_admin:
+            context['lista_analistas'] = User.objects.filter(
+                groups__name__iexact='analista'
+            ).order_by('first_name', 'last_name', 'username').distinct()
 
         return context
+
+
+@login_required
+@require_POST
+def asignar_analista_solicitud(request, solicitud_id):
+    if not is_admin(request.user):
+        return json_forbidden()
+
+    solicitud = get_object_or_404(SolicitudCompra, pk=solicitud_id)
+    analista_id = request.POST.get('analista_user_id')
+    analista = User.objects.filter(
+        id=analista_id,
+        groups__name__iexact='analista',
+    ).first()
+    if not analista:
+        return JsonResponse({"success": False, "error": "Analista inválido"}, status=400)
+
+    with transaction.atomic():
+        solicitud.analista_asignado = analista
+        solicitud.fecha_asignacion_analista = timezone.now()
+        pasos_catalogo = obtener_pasos_catalogo(solicitud)
+        for paso in pasos_catalogo:
+            SolicitudPasoEstado.objects.get_or_create(
+                solicitud=solicitud,
+                paso=paso,
+                defaults={'completado': False},
+            )
+        if pasos_catalogo:
+            solicitud.paso_actual = pasos_catalogo[0].numero
+        solicitud.save(update_fields=['analista_asignado', 'fecha_asignacion_analista', 'paso_actual'])
+
+    return JsonResponse({"success": True})
+
+
+@login_required
+@require_POST
+def toggle_paso_solicitud(request, solicitud_id, paso_id):
+    solicitud = get_object_or_404(SolicitudCompra, pk=solicitud_id)
+    es_admin_usuario = is_admin(request.user)
+    es_analista_asignado = (
+        is_analista(request.user) and solicitud.analista_asignado_id == request.user.id
+    )
+    if not (es_admin_usuario or es_analista_asignado):
+        return json_forbidden()
+
+    pasos_catalogo = obtener_pasos_catalogo(solicitud)
+    pasos_ids = [paso.id for paso in pasos_catalogo]
+    if paso_id not in pasos_ids:
+        return JsonResponse({"success": False, "error": "Paso inválido"}, status=400)
+
+    paso = get_object_or_404(ProcesoCompraPaso, pk=paso_id)
+    nota = request.POST.get('nota', '').strip()
+
+    with transaction.atomic():
+        estado, _ = SolicitudPasoEstado.objects.get_or_create(
+            solicitud=solicitud,
+            paso=paso,
+        )
+        estado.completado = not estado.completado
+        if estado.completado:
+            estado.fecha_completado = timezone.now()
+            estado.completado_por = request.user
+            estado.nota = nota
+        else:
+            estado.fecha_completado = None
+            estado.completado_por = None
+            estado.nota = ''
+        estado.save()
+
+        estados_map = {
+            estado_item.paso_id: estado_item
+            for estado_item in SolicitudPasoEstado.objects.filter(
+                solicitud=solicitud,
+                paso_id__in=pasos_ids,
+            )
+        }
+
+        paso_actual_num = None
+        for paso_item in pasos_catalogo:
+            estado_item = estados_map.get(paso_item.id)
+            if not estado_item or not estado_item.completado:
+                paso_actual_num = paso_item.numero
+                break
+        if paso_actual_num is None and pasos_catalogo:
+            paso_actual_num = pasos_catalogo[-1].numero
+
+        solicitud.paso_actual = paso_actual_num or solicitud.paso_actual
+        solicitud.save(update_fields=['paso_actual'])
+
+    completados = [
+        paso_id for paso_id, estado_item in estados_map.items()
+        if estado_item and estado_item.completado
+    ]
+
+    return JsonResponse({
+        "success": True,
+        "paso_actual": solicitud.paso_actual,
+        "completados": completados,
+    })
+
+
+@login_required
+@require_POST
+def set_paso_actual_solicitud(request, solicitud_id):
+    solicitud = get_object_or_404(SolicitudCompra, pk=solicitud_id)
+    es_admin_usuario = is_admin(request.user)
+    es_analista_asignado = (
+        is_analista(request.user) and solicitud.analista_asignado_id == request.user.id
+    )
+    if not (es_admin_usuario or es_analista_asignado):
+        return json_forbidden()
+
+    pasos_catalogo = obtener_pasos_catalogo(solicitud)
+    if not pasos_catalogo:
+        return JsonResponse({"success": False, "error": "Sin pasos configurados"}, status=400)
+
+    try:
+        nuevo_paso = int(request.POST.get('paso_actual', 0))
+    except (TypeError, ValueError):
+        return JsonResponse({"success": False, "error": "Paso inválido"}, status=400)
+
+    numeros_validos = [paso.numero for paso in pasos_catalogo]
+    if nuevo_paso not in numeros_validos:
+        return JsonResponse({"success": False, "error": "Paso fuera de rango"}, status=400)
+
+    solicitud.paso_actual = nuevo_paso
+    solicitud.save(update_fields=['paso_actual'])
+    return JsonResponse({"success": True, "paso_actual": solicitud.paso_actual})
+
+
+@login_required
+def bandeja_analista(request):
+    if not is_analista(request.user):
+        return HttpResponseForbidden("No autorizado.")
+
+    solicitudes = SolicitudCompra.objects.filter(
+        analista_asignado=request.user
+    ).select_related('seccion', 'seccion__departamento', 'producto', 'subproducto')
+
+    filtro_q = request.GET.get('q', '').strip()
+    filtro_estado = request.GET.get('estado', '').strip()
+    filtro_tipo = request.GET.get('tipo_proceso', '').strip()
+
+    if filtro_q:
+        solicitudes = solicitudes.filter(
+            Q(codigo_correlativo__icontains=filtro_q)
+            | Q(usuario__first_name__icontains=filtro_q)
+            | Q(usuario__last_name__icontains=filtro_q)
+            | Q(seccion__firmante_nombre__icontains=filtro_q)
+            | Q(producto__nombre__icontains=filtro_q)
+            | Q(subproducto__nombre__icontains=filtro_q)
+        )
+    if filtro_estado:
+        solicitudes = solicitudes.filter(estado=filtro_estado)
+    if filtro_tipo:
+        solicitudes = solicitudes.filter(tipo_proceso=filtro_tipo)
+
+    solicitudes = solicitudes.order_by('-fecha_asignacion_analista', '-id')
+    paginator = Paginator(solicitudes, 15)
+    page_number = request.GET.get('page')
+    solicitudes_paginadas = paginator.get_page(page_number)
+
+    context = {
+        'solicitudes': solicitudes_paginadas,
+        'filtros': {
+            'q': filtro_q,
+            'estado': filtro_estado,
+            'tipo_proceso': filtro_tipo,
+        },
+        'tipos_proceso': SolicitudCompra.TIPO_PROCESO_CHOICES,
+        'estados': SolicitudCompra.ESTADOS,
+    }
+    return render(request, 'scompras/analista/bandeja_analista.html', context)
+
+
+@login_required
+def dashboard_analista(request):
+    if not is_analista(request.user):
+        return HttpResponseForbidden("No autorizado.")
+
+    solicitudes = SolicitudCompra.objects.filter(analista_asignado=request.user)
+    conteo_estado = solicitudes.values('estado').annotate(total=Count('id')).order_by('estado')
+    conteo_tipo = solicitudes.values('tipo_proceso').annotate(total=Count('id')).order_by('tipo_proceso')
+    tipo_label_map = dict(SolicitudCompra.TIPO_PROCESO_CHOICES)
+    conteo_tipo_serializado = [
+        {
+            'tipo_proceso': item['tipo_proceso'],
+            'label': tipo_label_map.get(item['tipo_proceso'], item['tipo_proceso']),
+            'total': item['total'],
+        }
+        for item in conteo_tipo
+    ]
+
+    context = {
+        'conteo_estado': conteo_estado,
+        'conteo_tipo': conteo_tipo,
+        'conteo_estado_json': json.dumps(list(conteo_estado)),
+        'conteo_tipo_json': json.dumps(conteo_tipo_serializado),
+        'total_solicitudes': solicitudes.count(),
+    }
+    return render(request, 'scompras/analista/dashboard_analista.html', context)
+
+
+@login_required
+def post_login_redirect(request):
+    user = request.user
+    if is_analista(user):
+        return redirect('scompras:dashboard_analista')
+    if is_admin(user) or is_presupuesto(user):
+        return redirect('scompras:dashboard_admin')
+    if user.groups.filter(name='scompras').exists():
+        return redirect('scompras:dashboard_scompras')
+    return redirect('scompras:home')
+
+
+@login_required
+@admin_only_config
+def procesos_pasos_list(request):
+    filtro_tipo = request.GET.get('tipo_proceso', '').strip()
+    filtro_q = request.GET.get('q', '').strip()
+
+    pasos = ProcesoCompraPaso.objects.all()
+    if filtro_tipo:
+        pasos = pasos.filter(tipo_proceso=filtro_tipo)
+    if filtro_q:
+        pasos = pasos.filter(titulo__icontains=filtro_q)
+
+    context = {
+        'pasos': pasos.order_by('tipo_proceso', 'numero'),
+        'filtro_tipo': filtro_tipo,
+        'filtro_q': filtro_q,
+        'tipos_proceso': SolicitudCompra.TIPO_PROCESO_CHOICES,
+    }
+    return render(request, 'scompras/procesos/pasos_list.html', context)
+
+
+@login_required
+@admin_only_config
+def proceso_paso_create(request):
+    if request.method == 'POST':
+        form = ProcesoCompraPasoForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Paso creado correctamente.')
+            return redirect('scompras:procesos_pasos_list')
+    else:
+        form = ProcesoCompraPasoForm()
+
+    return render(request, 'scompras/procesos/paso_form.html', {
+        'form': form,
+        'titulo': 'Nuevo paso de proceso',
+    })
+
+
+@login_required
+@admin_only_config
+def proceso_paso_update(request, pk):
+    paso = get_object_or_404(ProcesoCompraPaso, pk=pk)
+    if request.method == 'POST':
+        form = ProcesoCompraPasoForm(request.POST, instance=paso)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Paso actualizado correctamente.')
+            return redirect('scompras:procesos_pasos_list')
+    else:
+        form = ProcesoCompraPasoForm(instance=paso)
+
+    return render(request, 'scompras/procesos/paso_form.html', {
+        'form': form,
+        'titulo': 'Editar paso de proceso',
+    })
+
+
+@login_required
+@admin_only_config
+@require_POST
+def proceso_paso_toggle_activo(request, pk):
+    if not is_admin(request.user):
+        return json_forbidden()
+    paso = get_object_or_404(ProcesoCompraPaso, pk=pk)
+    paso.activo = not paso.activo
+    paso.save(update_fields=['activo'])
+    return JsonResponse({"success": True, "activo": paso.activo})
 
 
 @login_required
@@ -1484,6 +1857,8 @@ def editar_solicitud(request):
     except SolicitudCompra.DoesNotExist:
         return JsonResponse({'success': False, 'error': 'Solicitud no encontrada.'})
 
+    tipo_anterior = solicitud.tipo_proceso
+    subtipo_anterior = solicitud.subtipo_baja_cuantia
     form = SolicitudCompraForm(request.POST, instance=solicitud)
 
     if form.is_valid():
@@ -1491,7 +1866,41 @@ def editar_solicitud(request):
             solicitud_actualizada = form.save(commit=False)
             # Preservar el correlativo original en edición para evitar regeneración.
             solicitud_actualizada.codigo_correlativo = solicitud.codigo_correlativo
+            if solicitud_actualizada.tipo_proceso != 'BAJA_CUANTIA':
+                solicitud_actualizada.subtipo_baja_cuantia = None
             solicitud_actualizada.save()
+            tipo_cambio = (
+                solicitud_actualizada.tipo_proceso != tipo_anterior
+                or solicitud_actualizada.subtipo_baja_cuantia != subtipo_anterior
+            )
+            if tipo_cambio:
+                pasos_catalogo = obtener_pasos_catalogo(solicitud_actualizada)
+                for paso in pasos_catalogo:
+                    SolicitudPasoEstado.objects.get_or_create(
+                        solicitud=solicitud_actualizada,
+                        paso=paso,
+                        defaults={'completado': False},
+                    )
+                estados = SolicitudPasoEstado.objects.filter(
+                    solicitud=solicitud_actualizada,
+                    paso__in=pasos_catalogo,
+                )
+                hay_completados = estados.filter(completado=True).exists()
+                if pasos_catalogo:
+                    if hay_completados:
+                        paso_actual_num = None
+                        estados_map = {estado.paso_id: estado for estado in estados}
+                        for paso in pasos_catalogo:
+                            estado = estados_map.get(paso.id)
+                            if not estado or not estado.completado:
+                                paso_actual_num = paso.numero
+                                break
+                        if paso_actual_num is None:
+                            paso_actual_num = pasos_catalogo[-1].numero
+                        solicitud_actualizada.paso_actual = paso_actual_num
+                    else:
+                        solicitud_actualizada.paso_actual = pasos_catalogo[0].numero
+                    solicitud_actualizada.save(update_fields=['paso_actual'])
         except IntegrityError:
             return JsonResponse(
                 {'success': False, 'error': 'Ya existe una solicitud con ese correlativo.'}
@@ -2045,6 +2454,8 @@ def signin(request):
                     return redirect('scompras:crear_requerimiento')
                 elif g.name == 'scompras':
                     return redirect('scompras:dashboard_usuario')
+                elif g.name.upper() == 'ANALISTA':
+                    return redirect('scompras:dashboard_analista')
             # Si no se encuentra el grupo adecuado, se redirige a una página por defecto
             return redirect('scompras:signin')
         else:
