@@ -2319,6 +2319,8 @@ def signin(request):
                     return redirect('scompras:crear_requerimiento')
                 elif g.name == 'scompras':
                     return redirect('scompras:dashboard_usuario')
+                elif g.name.upper() == 'ANALISTA':
+                    return redirect('scompras:bandeja_analista')
             # Si no se encuentra el grupo adecuado, se redirige a una página por defecto
             return redirect('scompras:signin')
         else:
