@@ -26,6 +26,8 @@ urlpatterns = [
     path('dashboard-usuario/', views.dashboard_scompras, name='dashboard_usuario'),
     path('dashboard/admin/', views.dashboard_admin, name='dashboard_admin'),
     path('dashboard/scompras/', views.dashboard_scompras, name='dashboard_scompras'),
+    path('analista/dashboard/', views.dashboard_analista, name='dashboard_analista'),
+    path('analista/bandeja/', views.bandeja_analista, name='bandeja_analista'),
 
     
     
@@ -63,7 +65,10 @@ urlpatterns = [
     path('solicitud/<int:solicitud_id>/asignar-analista/', views.asignar_analista_solicitud, name='asignar_analista_solicitud'),
     path('solicitud/<int:solicitud_id>/pasos/<int:paso_id>/toggle/', views.toggle_paso_solicitud, name='toggle_paso_solicitud'),
     path('solicitud/<int:solicitud_id>/set-paso-actual/', views.set_paso_actual_solicitud, name='set_paso_actual_solicitud'),
-    path('analista/bandeja/', views.bandeja_analista, name='bandeja_analista'),
+    path('admin/procesos/', views.procesos_pasos_list, name='procesos_pasos_list'),
+    path('admin/procesos/nuevo/', views.procesos_pasos_create, name='procesos_pasos_create'),
+    path('admin/procesos/<int:pk>/editar/', views.procesos_pasos_edit, name='procesos_pasos_edit'),
+    path('admin/procesos/<int:pk>/toggle/', views.procesos_pasos_toggle, name='procesos_pasos_toggle'),
     path('solicitud/<int:solicitud_id>/cdp/nuevo/', views.crear_cdp_solicitud, name='crear_cdp_solicitud'),
     path('cdp/<int:cdp_id>/ejecutar/', views.ejecutar_cdp, name='ejecutar_cdp'),
     path('cdp/<int:cdp_id>/liberar/', views.liberar_cdp, name='liberar_cdp'),

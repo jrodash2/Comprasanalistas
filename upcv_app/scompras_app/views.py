@@ -36,6 +36,7 @@ from .form import (
     LiberarCDPForm,
     LiberarCDPSolicitudForm,
     TransferenciaPresupuestariaForm,
+    ProcesoCompraPasoForm,
 )
 from .models import (
     FechaInsumo,
@@ -1168,19 +1169,119 @@ def bandeja_analista(request):
         'tipos_proceso': SolicitudCompra.TIPO_PROCESO_CHOICES,
         'estados': SolicitudCompra.ESTADOS,
     }
-    return render(request, 'scompras/analista_bandeja.html', context)
+    return render(request, 'scompras/analista/bandeja_analista.html', context)
+
+
+@login_required
+def dashboard_analista(request):
+    if not is_analista(request.user):
+        return HttpResponseForbidden("No autorizado.")
+
+    solicitudes = SolicitudCompra.objects.filter(analista_asignado=request.user)
+    conteo_estado = solicitudes.values('estado').annotate(total=Count('id')).order_by('estado')
+    conteo_tipo = solicitudes.values('tipo_proceso').annotate(total=Count('id')).order_by('tipo_proceso')
+    tipo_label_map = dict(SolicitudCompra.TIPO_PROCESO_CHOICES)
+    conteo_tipo_serializado = [
+        {
+            'tipo_proceso': item['tipo_proceso'],
+            'label': tipo_label_map.get(item['tipo_proceso'], item['tipo_proceso']),
+            'total': item['total'],
+        }
+        for item in conteo_tipo
+    ]
+
+    context = {
+        'conteo_estado': conteo_estado,
+        'conteo_tipo': conteo_tipo,
+        'conteo_estado_json': json.dumps(list(conteo_estado)),
+        'conteo_tipo_json': json.dumps(conteo_tipo_serializado),
+        'total_solicitudes': solicitudes.count(),
+    }
+    return render(request, 'scompras/analista/dashboard_analista.html', context)
 
 
 @login_required
 def post_login_redirect(request):
     user = request.user
     if is_analista(user):
-        return redirect('scompras:bandeja_analista')
+        return redirect('scompras:dashboard_analista')
     if is_admin(user) or is_presupuesto(user):
         return redirect('scompras:dashboard_admin')
     if user.groups.filter(name='scompras').exists():
         return redirect('scompras:dashboard_scompras')
     return redirect('scompras:home')
+
+
+@login_required
+@admin_only_config
+def procesos_pasos_list(request):
+    filtro_tipo = request.GET.get('tipo_proceso', '').strip()
+    filtro_activo = request.GET.get('activo', '').strip()
+
+    pasos = ProcesoCompraPaso.objects.all()
+    if filtro_tipo:
+        pasos = pasos.filter(tipo_proceso=filtro_tipo)
+    if filtro_activo == 'activos':
+        pasos = pasos.filter(activo=True)
+    elif filtro_activo == 'inactivos':
+        pasos = pasos.filter(activo=False)
+
+    context = {
+        'pasos': pasos.order_by('tipo_proceso', 'numero'),
+        'filtro_tipo': filtro_tipo,
+        'filtro_activo': filtro_activo,
+        'tipos_proceso': SolicitudCompra.TIPO_PROCESO_CHOICES,
+    }
+    return render(request, 'scompras/admin_procesos/procesos_pasos_list.html', context)
+
+
+@login_required
+@admin_only_config
+def procesos_pasos_create(request):
+    if request.method == 'POST':
+        form = ProcesoCompraPasoForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Paso creado correctamente.')
+            return redirect('scompras:procesos_pasos_list')
+    else:
+        form = ProcesoCompraPasoForm()
+
+    return render(request, 'scompras/admin_procesos/procesos_pasos_form.html', {
+        'form': form,
+        'titulo': 'Nuevo paso de proceso',
+    })
+
+
+@login_required
+@admin_only_config
+def procesos_pasos_edit(request, pk):
+    paso = get_object_or_404(ProcesoCompraPaso, pk=pk)
+    if request.method == 'POST':
+        form = ProcesoCompraPasoForm(request.POST, instance=paso)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Paso actualizado correctamente.')
+            return redirect('scompras:procesos_pasos_list')
+    else:
+        form = ProcesoCompraPasoForm(instance=paso)
+
+    return render(request, 'scompras/admin_procesos/procesos_pasos_form.html', {
+        'form': form,
+        'titulo': 'Editar paso de proceso',
+    })
+
+
+@login_required
+@admin_only_config
+@require_POST
+def procesos_pasos_toggle(request, pk):
+    paso = get_object_or_404(ProcesoCompraPaso, pk=pk)
+    paso.activo = not paso.activo
+    paso.save(update_fields=['activo'])
+    estado = 'activado' if paso.activo else 'desactivado'
+    messages.success(request, f'Paso {estado} correctamente.')
+    return redirect('scompras:procesos_pasos_list')
 
 
 @login_required
@@ -2320,7 +2421,7 @@ def signin(request):
                 elif g.name == 'scompras':
                     return redirect('scompras:dashboard_usuario')
                 elif g.name.upper() == 'ANALISTA':
-                    return redirect('scompras:bandeja_analista')
+                    return redirect('scompras:dashboard_analista')
             # Si no se encuentra el grupo adecuado, se redirige a una página por defecto
             return redirect('scompras:signin')
         else:

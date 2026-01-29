@@ -19,6 +19,7 @@ from .models import (
     PresupuestoRenglon,
     PresupuestoAnual,
     TransferenciaPresupuestaria,
+    ProcesoCompraPaso,
 )
 
 from django.db.models import Sum, F, Value
@@ -197,8 +198,20 @@ class UserEditForm(forms.ModelForm):
                 perfil.foto = foto
 
             perfil.save()
-
         return user
+
+
+class ProcesoCompraPasoForm(forms.ModelForm):
+    class Meta:
+        model = ProcesoCompraPaso
+        fields = ['tipo_proceso', 'numero', 'titulo', 'duracion_referencia', 'activo']
+        widgets = {
+            'tipo_proceso': forms.Select(attrs={'class': 'form-control'}),
+            'numero': forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
+            'titulo': forms.TextInput(attrs={'class': 'form-control'}),
+            'duracion_referencia': forms.TextInput(attrs={'class': 'form-control'}),
+            'activo': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
 
 
 
