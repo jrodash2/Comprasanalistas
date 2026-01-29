@@ -9,6 +9,7 @@ from django.urls import reverse
 from django.db.models import Sum, Prefetch
 from django.db.models.signals import post_save
 from django.utils import timezone
+from django.conf import settings
 
 class Institucion(models.Model):
     nombre = models.CharField(max_length=255)
@@ -65,6 +66,19 @@ class SolicitudCompra(models.Model):
         ('Alta', 'Alta'),
     ]
 
+    TIPO_PROCESO_CHOICES = [
+        ('BAJA_CUANTIA', 'Baja cuantía'),
+        ('COMPRA_DIRECTA', 'Compra directa'),
+        ('COTIZACION', 'Cotización'),
+        ('CONTRATO_ABIERTO', 'Contrato abierto'),
+        ('LICITACION', 'Licitación'),
+    ]
+
+    SUBTIPO_BAJA_CUANTIA_CHOICES = [
+        ('CHEQUE', 'Trámite de cheque'),
+        ('ACREDITAMIENTO', 'Acreditamiento a cuenta'),
+    ]
+
     seccion = models.ForeignKey('Seccion', on_delete=models.CASCADE, related_name='solicitudes')
     usuario = models.ForeignKey(User, on_delete=models.CASCADE)
     descripcion = models.TextField()
@@ -75,6 +89,26 @@ class SolicitudCompra(models.Model):
     subproducto = models.ForeignKey('Subproducto', on_delete=models.CASCADE, null=True, blank=True)
     insumos = models.ManyToManyField('Insumo', related_name='solicitudes', blank=True)
     codigo_correlativo = models.CharField(max_length=50, blank=True, null=True, unique=True)
+    analista_asignado = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="solicitudes_asignadas",
+    )
+    tipo_proceso = models.CharField(
+        max_length=30,
+        choices=TIPO_PROCESO_CHOICES,
+        default='COMPRA_DIRECTA',
+    )
+    subtipo_baja_cuantia = models.CharField(
+        max_length=20,
+        choices=SUBTIPO_BAJA_CUANTIA_CHOICES,
+        null=True,
+        blank=True,
+    )
+    paso_actual = models.PositiveIntegerField(default=1)
+    fecha_asignacion_analista = models.DateTimeField(null=True, blank=True)
 
 
     def __str__(self):
@@ -87,6 +121,38 @@ class SolicitudCompra(models.Model):
         if cdp_queryset and cdp_queryset.filter(estado=CDP.Estado.RESERVADO).exists():
             raise ValidationError('Libere los CDP reservados antes de eliminar la solicitud.')
         return super().delete(using=using, keep_parents=keep_parents)
+
+
+class ProcesoCompraPaso(models.Model):
+    tipo_proceso = models.CharField(max_length=30, choices=SolicitudCompra.TIPO_PROCESO_CHOICES)
+    numero = models.PositiveIntegerField()
+    titulo = models.CharField(max_length=255)
+    duracion_referencia = models.CharField(max_length=80, blank=True)
+    activo = models.BooleanField(default=True)
+
+    class Meta:
+        unique_together = ('tipo_proceso', 'numero')
+        ordering = ['tipo_proceso', 'numero']
+
+    def __str__(self):
+        return f'{self.get_tipo_proceso_display()} - {self.numero}. {self.titulo}'
+
+
+class SolicitudPasoEstado(models.Model):
+    solicitud = models.ForeignKey(SolicitudCompra, on_delete=models.CASCADE, related_name="pasos_estado")
+    paso = models.ForeignKey(ProcesoCompraPaso, on_delete=models.CASCADE)
+    completado = models.BooleanField(default=False)
+    fecha_completado = models.DateTimeField(null=True, blank=True)
+    completado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
+    nota = models.TextField(blank=True)
+
+    class Meta:
+        unique_together = ('solicitud', 'paso')
 
 
 
