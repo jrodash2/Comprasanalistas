@@ -2218,7 +2218,7 @@ def generar_pdf_cdp(request, cdp_id):
 
     encargado_nombre = request.user.get_full_name() or request.user.username
     autorizado_por_nombre = encargado_nombre
-    autorizado_por_cargo = "Encargado de Compras"
+    autorizado_por_cargo = "Encargado de la Sección de Presupuesto"
     vobo_nombre = "________________"
     vobo_cargo = "________________"
     if solicitud and solicitud.seccion:

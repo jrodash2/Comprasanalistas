@@ -250,56 +250,48 @@
 <!-- FOOTER FIJO (NO mover estilos aquí) -->
 <div id="footer_content">
 
-  <table width="100%" style="border-collapse:collapse;">
+  <table width="100%" style="border-collapse:collapse; text-align:center;">
 
+    <!-- TÍTULO -->
     <tr>
-      <td width="50%" align="center" valign="top">
-        <b class="sig-title">Solicitado por</b>
-      </td>
-
-      <td width="50%" align="center" valign="top">
-        <b class="sig-title">Autorizado por</b>
+      <td align="center" valign="top">
+        <b class="sig-title">Aprobado por</b>
       </td>
     </tr>
 
-    <!-- FILA PARA FIRMA -->
-    <tr style="height:55px;">
-      <td width="50%" align="center" valign="bottom"></td>
-      <td width="50%" align="center" valign="bottom"></td>
-    </tr>
-
+    <!-- ESPACIO PARA FIRMA -->
     <tr>
-      <td width="50%" align="center">
-        <div class="sig-line"></div>
-      </td>
-
-      <td width="50%" align="center">
-        <div class="sig-line"></div>
-      </td>
+      <td style="height:65px;"></td>
     </tr>
 
-    <!-- ✅ menos espacio entre línea y nombre -->
-    <tr style="height:4px;">
-      <td></td>
-      <td></td>
-    </tr>
-
+    <!-- LÍNEA DE FIRMA -->
     <tr>
-      <td width="50%" align="center">
-        <div class="sig-name">{{ solicitado_por_nombre }}</div>
+      <td align="center">
+        <div class="sig-line" style="width:80%;"></div>
       </td>
+    </tr>
 
-      <td width="50%" align="center">
+    <!-- PEQUEÑO ESPACIO -->
+    <tr>
+      <td style="height:4px;"></td>
+    </tr>
+<!-- LÍNEA DE FIRMA -->
+<tr>
+  <td align="center">
+  f.___________________________
+  </td>
+</tr>
+
+    <!-- NOMBRE -->
+    <tr>
+      <td align="center">
         <div class="sig-name">{{ autorizado_por_nombre }}</div>
       </td>
     </tr>
 
+    <!-- CARGO -->
     <tr>
-      <td width="50%" align="center">
-        <div class="sig-role">{{ solicitado_por_cargo }}</div>
-      </td>
-
-      <td width="50%" align="center">
+      <td align="center">
         <div class="sig-role">{{ autorizado_por_cargo }}</div>
       </td>
     </tr>
@@ -313,6 +305,7 @@
 
 </div>
 <!-- /FOOTER FIJO -->
+
 
   <!-- HEADER -->
   <table class="hdr" width="100%">
@@ -454,6 +447,21 @@
       </tr>
     {% endif %}
   </table>
+<div style="margin-top:20px; text-align:left;">
+
+  <div style="font-size:9px; font-weight:500; color:#64748b; margin-bottom:6px;">
+    Solicitado por
+  </div>
+
+  <div style="font-size:11px; font-weight:700; color:#0b1220; text-transform:uppercase;">
+    {{ solicitado_por_nombre }}
+  </div>
+
+  <div style="font-size:9px; color:#64748b; margin-top:2px;">
+    {{ solicitado_por_cargo }}
+  </div>
+
+</div>
 
 </body>
 </html>
