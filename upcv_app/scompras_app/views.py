@@ -1233,6 +1233,7 @@ def lista_tipos_proceso(request):
     tipos = TipoProcesoCompra.objects.all().order_by('orden', 'nombre')
     return render(request, 'scompras/procesos/tipos_proceso_list.html', {
         'tipos': tipos,
+        'es_admin': is_admin(request.user),
     })
 
 
