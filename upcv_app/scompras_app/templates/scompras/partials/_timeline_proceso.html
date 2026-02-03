@@ -1,7 +1,56 @@
 {% load custom_filters %}
 
 {% if puede_ver_timeline %}
-  <div class="card mb-3">
+  <style>
+    .timeline-proceso {
+      color: #111827;
+    }
+
+    .timeline-proceso .timeline-step-circle {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.95rem;
+      font-weight: 600;
+      border: 2px solid #D1D5DB;
+      background: #ffffff;
+      color: #111827;
+    }
+
+    .timeline-proceso .timeline-step--completed .timeline-step-circle {
+      background: #0072B2;
+      border-color: #0072B2;
+      color: #ffffff;
+    }
+
+    .timeline-proceso .timeline-step--in-progress .timeline-step-circle {
+      background: #E69F00;
+      border-color: #E69F00;
+      color: #ffffff;
+      border-width: 3px;
+    }
+
+    .timeline-proceso .timeline-step--pending .timeline-step-circle {
+      background: #ffffff;
+      border-color: #9CA3AF;
+      color: #9CA3AF;
+    }
+
+    .timeline-proceso .timeline-step-icon {
+      line-height: 1;
+    }
+
+    .timeline-proceso .timeline-legend .timeline-step-circle {
+      width: 20px;
+      height: 20px;
+      font-size: 0.75rem;
+    }
+  </style>
+
+  <div class="card mb-3 timeline-proceso">
     <div class="card-body">
       <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
         <div>
@@ -23,9 +72,9 @@
         </div>
         {% if es_admin_timeline %}
           <div class="d-flex flex-wrap gap-2">
-            <a class="btn btn-sm btn-outline-secondary" href="{% url 'scompras:lista_tipos_proceso' %}">
-              Administrar pasos
-            </a>
+            <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#modalAsignarTipoProceso">
+              Asignar tipo de proceso
+            </button>
             <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalAsignarAnalista">
               Asignar analista
             </button>
@@ -38,86 +87,86 @@
           {% for paso in pasos_catalogo %}
             {% with estado=pasos_estado_map|dict_get:paso.id %}
               {% if estado and estado.completado %}
-                {% with badge_class="bg-success" %}
+                {% with step_state="completed" step_icon="✓" %}
                   {% if puede_marcar_pasos %}
                     <button
                       type="button"
-                      class="btn p-0 border-0 bg-transparent paso-timeline-btn"
+                      class="btn p-0 border-0 bg-transparent paso-timeline-btn timeline-step timeline-step--{{ step_state }}"
                       data-step-id="{{ paso.id }}"
                       data-step-title="{{ paso.titulo }}"
                       data-step-completed="true"
                       data-bs-toggle="tooltip"
                       title="{{ paso.titulo }}{% if paso.duracion_referencia %} {{ paso.duracion_referencia }}{% endif %}"
                     >
-                      <span class="badge rounded-circle {{ badge_class }} d-inline-flex align-items-center justify-content-center"
-                            style="width: 34px; height: 34px; font-size: 0.9rem;">
-                        {{ paso.numero }}
+                      <span class="timeline-step-circle" aria-hidden="true">
+                        <span class="timeline-step-icon">{{ step_icon }}</span>
                       </span>
                     </button>
                   {% else %}
                     <span
-                      class="badge rounded-circle {{ badge_class }} d-inline-flex align-items-center justify-content-center"
-                      style="width: 34px; height: 34px; font-size: 0.9rem;"
+                      class="timeline-step timeline-step--{{ step_state }}"
                       data-bs-toggle="tooltip"
                       title="{{ paso.titulo }}{% if paso.duracion_referencia %} {{ paso.duracion_referencia }}{% endif %}"
                     >
-                      {{ paso.numero }}
+                      <span class="timeline-step-circle" aria-hidden="true">
+                        <span class="timeline-step-icon">{{ step_icon }}</span>
+                      </span>
                     </span>
                   {% endif %}
                 {% endwith %}
               {% elif paso.numero == paso_actual_num %}
-                {% with badge_class="bg-primary" %}
+                {% with step_state="in-progress" step_icon="▶" %}
                   {% if puede_marcar_pasos %}
                     <button
                       type="button"
-                      class="btn p-0 border-0 bg-transparent paso-timeline-btn"
+                      class="btn p-0 border-0 bg-transparent paso-timeline-btn timeline-step timeline-step--{{ step_state }}"
                       data-step-id="{{ paso.id }}"
                       data-step-title="{{ paso.titulo }}"
                       data-step-completed="false"
                       data-bs-toggle="tooltip"
                       title="{{ paso.titulo }}{% if paso.duracion_referencia %} {{ paso.duracion_referencia }}{% endif %}"
                     >
-                      <span class="badge rounded-circle {{ badge_class }} d-inline-flex align-items-center justify-content-center"
-                            style="width: 34px; height: 34px; font-size: 0.9rem;">
-                        {{ paso.numero }}
+                      <span class="timeline-step-circle" aria-hidden="true">
+                        <span class="timeline-step-icon">{{ step_icon }}</span>
                       </span>
                     </button>
                   {% else %}
                     <span
-                      class="badge rounded-circle {{ badge_class }} d-inline-flex align-items-center justify-content-center"
-                      style="width: 34px; height: 34px; font-size: 0.9rem;"
+                      class="timeline-step timeline-step--{{ step_state }}"
                       data-bs-toggle="tooltip"
                       title="{{ paso.titulo }}{% if paso.duracion_referencia %} {{ paso.duracion_referencia }}{% endif %}"
                     >
-                      {{ paso.numero }}
+                      <span class="timeline-step-circle" aria-hidden="true">
+                        <span class="timeline-step-icon">{{ step_icon }}</span>
+                      </span>
                     </span>
                   {% endif %}
                 {% endwith %}
               {% else %}
-                {% with badge_class="bg-secondary" %}
+                {% with step_state="pending" step_icon="•" %}
                   {% if puede_marcar_pasos %}
                     <button
                       type="button"
-                      class="btn p-0 border-0 bg-transparent paso-timeline-btn"
+                      class="btn p-0 border-0 bg-transparent paso-timeline-btn timeline-step timeline-step--{{ step_state }}"
                       data-step-id="{{ paso.id }}"
                       data-step-title="{{ paso.titulo }}"
                       data-step-completed="false"
                       data-bs-toggle="tooltip"
                       title="{{ paso.titulo }}{% if paso.duracion_referencia %} {{ paso.duracion_referencia }}{% endif %}"
                     >
-                      <span class="badge rounded-circle {{ badge_class }} d-inline-flex align-items-center justify-content-center"
-                            style="width: 34px; height: 34px; font-size: 0.9rem;">
-                        {{ paso.numero }}
+                      <span class="timeline-step-circle" aria-hidden="true">
+                        <span class="timeline-step-icon">{{ step_icon }}</span>
                       </span>
                     </button>
                   {% else %}
                     <span
-                      class="badge rounded-circle {{ badge_class }} d-inline-flex align-items-center justify-content-center"
-                      style="width: 34px; height: 34px; font-size: 0.9rem;"
+                      class="timeline-step timeline-step--{{ step_state }}"
                       data-bs-toggle="tooltip"
                       title="{{ paso.titulo }}{% if paso.duracion_referencia %} {{ paso.duracion_referencia }}{% endif %}"
                     >
-                      {{ paso.numero }}
+                      <span class="timeline-step-circle" aria-hidden="true">
+                        <span class="timeline-step-icon">{{ step_icon }}</span>
+                      </span>
                     </span>
                   {% endif %}
                 {% endwith %}
@@ -125,10 +174,31 @@
             {% endwith %}
           {% endfor %}
         </div>
-        <div class="d-flex flex-wrap gap-3 mt-3 small text-muted">
-          <div><span class="badge bg-success me-1">&nbsp;</span>Completado</div>
-          <div><span class="badge bg-primary me-1">&nbsp;</span>En curso</div>
-          <div><span class="badge bg-secondary me-1">&nbsp;</span>Pendiente</div>
+        <div class="d-flex flex-wrap gap-3 mt-3 small text-muted timeline-legend">
+          <div class="d-flex align-items-center gap-1">
+            <span class="timeline-step timeline-step--completed">
+              <span class="timeline-step-circle" aria-hidden="true">
+                <span class="timeline-step-icon">✓</span>
+              </span>
+            </span>
+            <span>Completado</span>
+          </div>
+          <div class="d-flex align-items-center gap-1">
+            <span class="timeline-step timeline-step--in-progress">
+              <span class="timeline-step-circle" aria-hidden="true">
+                <span class="timeline-step-icon">▶</span>
+              </span>
+            </span>
+            <span>En curso</span>
+          </div>
+          <div class="d-flex align-items-center gap-1">
+            <span class="timeline-step timeline-step--pending">
+              <span class="timeline-step-circle" aria-hidden="true">
+                <span class="timeline-step-icon">•</span>
+              </span>
+            </span>
+            <span>Pendiente</span>
+          </div>
         </div>
       {% else %}
         <p class="text-muted mb-0">No hay pasos configurados para este proceso.</p>
@@ -161,6 +231,49 @@
   {% endif %}
 
   {% if es_admin_timeline %}
+    <div class="modal fade" id="modalAsignarTipoProceso" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Asignar tipo de proceso</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+          </div>
+          <div class="modal-body">
+            <div class="mb-3">
+              <label class="form-label">Tipo de proceso</label>
+              <select class="form-select" id="selectTipoProcesoAsignar">
+                <option value="">Seleccione un tipo</option>
+                {% for tipo in tipos_proceso_disponibles %}
+                  <option
+                    value="{{ tipo.id }}"
+                    data-codigo="{{ tipo.codigo }}"
+                    {% if tipo_proceso_actual and tipo.id == tipo_proceso_actual.id %}selected{% endif %}
+                  >
+                    {{ tipo.nombre }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="mb-3" id="subtipoBajaCuantiaAsignarGroup" style="display: none;">
+              <label class="form-label">Subtipo baja cuantía</label>
+              <select class="form-select" id="selectSubtipoBajaCuantiaAsignar">
+                <option value="">Seleccione un subtipo</option>
+                {% for subtipo, label in solicitud.SUBTIPO_BAJA_CUANTIA_CHOICES %}
+                  <option value="{{ subtipo }}" {% if subtipo_baja_actual == subtipo %}selected{% endif %}>
+                    {{ label }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button type="button" class="btn btn-primary" id="btnGuardarTipoProceso">Guardar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="modal fade" id="modalAsignarAnalista" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">

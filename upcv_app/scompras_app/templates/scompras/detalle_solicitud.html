@@ -1560,6 +1560,81 @@ $('#btnGuardarServicio').on('click', function() {
                 });
         });
     }
+
+    const btnGuardarTipoProceso = document.getElementById('btnGuardarTipoProceso');
+    const selectTipoProcesoAsignar = document.getElementById('selectTipoProcesoAsignar');
+    const selectSubtipoBajaCuantiaAsignar = document.getElementById('selectSubtipoBajaCuantiaAsignar');
+    const subtipoBajaCuantiaAsignarGroup = document.getElementById('subtipoBajaCuantiaAsignarGroup');
+
+    function toggleSubtipoBajaCuantiaAsignar() {
+        if (!selectTipoProcesoAsignar || !subtipoBajaCuantiaAsignarGroup || !selectSubtipoBajaCuantiaAsignar) {
+            return;
+        }
+        const selectedOption = selectTipoProcesoAsignar.options[selectTipoProcesoAsignar.selectedIndex];
+        const codigoSeleccionado = selectedOption ? selectedOption.dataset.codigo : '';
+        if (codigoSeleccionado === 'baja-cuantia') {
+            subtipoBajaCuantiaAsignarGroup.style.display = '';
+        } else {
+            subtipoBajaCuantiaAsignarGroup.style.display = 'none';
+            selectSubtipoBajaCuantiaAsignar.value = '';
+        }
+    }
+
+    if (selectTipoProcesoAsignar) {
+        selectTipoProcesoAsignar.addEventListener('change', toggleSubtipoBajaCuantiaAsignar);
+        toggleSubtipoBajaCuantiaAsignar();
+    }
+
+    if (btnGuardarTipoProceso && selectTipoProcesoAsignar) {
+        btnGuardarTipoProceso.addEventListener('click', () => {
+            const tipoProcesoId = selectTipoProcesoAsignar.value;
+            const selectedOption = selectTipoProcesoAsignar.options[selectTipoProcesoAsignar.selectedIndex];
+            const codigoSeleccionado = selectedOption ? selectedOption.dataset.codigo : '';
+            const subtipoBaja = selectSubtipoBajaCuantiaAsignar ? selectSubtipoBajaCuantiaAsignar.value : '';
+
+            if (!tipoProcesoId) {
+                showModalAlert('Seleccione un tipo de proceso.');
+                return;
+            }
+
+            if (codigoSeleccionado === 'baja-cuantia' && !subtipoBaja) {
+                showModalAlert('Seleccione un subtipo de baja cuantía.');
+                return;
+            }
+
+            const params = new URLSearchParams({
+                tipo_proceso_id: tipoProcesoId,
+            });
+            if (codigoSeleccionado === 'baja-cuantia') {
+                params.append('subtipo_baja_cuantia', subtipoBaja);
+            }
+
+            fetch("{% url 'scompras:asignar_tipo_proceso_solicitud' solicitud.id %}", {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrftoken,
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: params,
+            })
+                .then((response) =>
+                    response.json().then((data) => ({
+                        ok: response.ok,
+                        data,
+                    }))
+                )
+                .then(({ ok, data }) => {
+                    if (ok && data.success) {
+                        window.location.reload();
+                    } else {
+                        showModalAlert(data.error || 'No se pudo asignar el tipo de proceso.');
+                    }
+                })
+                .catch(() => {
+                    showModalAlert('No se pudo asignar el tipo de proceso.');
+                });
+        });
+    }
 });
 </script>
 
