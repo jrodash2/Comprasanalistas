@@ -9,7 +9,9 @@
         <div class="card-body">
           <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
             <h4 class="mb-0">Tipos de proceso</h4>
-            <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalNuevoTipo">+ Nuevo tipo</button>
+            {% if es_admin or request.user.is_superuser %}
+              <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalNuevoTipo" type="button">+ Nuevo tipo</button>
+            {% endif %}
           </div>
 
           <div class="table-responsive">
@@ -62,9 +64,18 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
       </div>
       <div class="modal-body">
+        <div class="alert alert-danger d-none" id="errTipo"></div>
         <div class="mb-3">
           <label class="form-label">Nombre</label>
-          <input type="text" class="form-control" id="nuevoTipoNombre" placeholder="Nombre del tipo">
+          <input type="text" class="form-control" id="nuevoTipoNombre" placeholder="Nombre del tipo" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Orden</label>
+          <input type="number" class="form-control" id="nuevoTipoOrden" placeholder="0">
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="nuevoTipoActivo" checked>
+          <label class="form-check-label" for="nuevoTipoActivo">Activo</label>
         </div>
       </div>
       <div class="modal-footer">
@@ -96,13 +107,41 @@
     const csrftoken = getCookie('csrftoken');
     const btnGuardar = document.getElementById('btnGuardarTipoProceso');
     const inputNombre = document.getElementById('nuevoTipoNombre');
+    const inputOrden = document.getElementById('nuevoTipoOrden');
+    const inputActivo = document.getElementById('nuevoTipoActivo');
+    const errorBox = document.getElementById('errTipo');
+    const modalElement = document.getElementById('modalNuevoTipo');
+    const modal = modalElement ? new bootstrap.Modal(modalElement) : null;
+
+    function resetModal() {
+      if (inputNombre) inputNombre.value = '';
+      if (inputOrden) inputOrden.value = '';
+      if (inputActivo) inputActivo.checked = true;
+      if (errorBox) {
+        errorBox.textContent = '';
+        errorBox.classList.add('d-none');
+      }
+    }
+
+    if (modalElement) {
+      modalElement.addEventListener('show.bs.modal', resetModal);
+    }
 
     if (btnGuardar) {
       btnGuardar.addEventListener('click', () => {
         const nombre = inputNombre ? inputNombre.value.trim() : '';
+        const orden = inputOrden ? inputOrden.value.trim() : '';
+        const activo = inputActivo && inputActivo.checked ? '1' : '';
         if (!nombre) {
+          if (errorBox) {
+            errorBox.textContent = 'El nombre es obligatorio.';
+            errorBox.classList.remove('d-none');
+          }
           return;
         }
+        btnGuardar.disabled = true;
+        const originalText = btnGuardar.textContent;
+        btnGuardar.textContent = 'Guardando...';
         fetch("{% url 'scompras:crear_tipo_proceso' %}", {
           method: 'POST',
           headers: {
@@ -110,17 +149,32 @@
             'X-Requested-With': 'XMLHttpRequest',
             'Content-Type': 'application/x-www-form-urlencoded',
           },
-          body: new URLSearchParams({ nombre }),
+          body: new URLSearchParams({ nombre, orden, activo }),
         })
           .then((response) => response.json())
           .then((data) => {
             if (data.success) {
+              if (modal) {
+                modal.hide();
+              }
               window.location.reload();
             } else {
-              window.location.reload();
+              if (errorBox) {
+                errorBox.textContent = data.error || 'No se pudo crear el tipo.';
+                errorBox.classList.remove('d-none');
+              }
             }
           })
-          .catch(() => window.location.reload());
+          .catch(() => {
+            if (errorBox) {
+              errorBox.textContent = 'Ocurrió un error inesperado.';
+              errorBox.classList.remove('d-none');
+            }
+          })
+          .finally(() => {
+            btnGuardar.disabled = false;
+            btnGuardar.textContent = originalText;
+          });
       });
     }
   })();

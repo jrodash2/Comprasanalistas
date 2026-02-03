@@ -1233,6 +1233,7 @@ def lista_tipos_proceso(request):
     tipos = TipoProcesoCompra.objects.all().order_by('orden', 'nombre')
     return render(request, 'scompras/procesos/tipos_proceso_list.html', {
         'tipos': tipos,
+        'es_admin': is_admin(request.user),
     })
 
 
@@ -1248,7 +1249,18 @@ def crear_tipo_proceso(request):
     if TipoProcesoCompra.objects.filter(nombre__iexact=nombre).exists():
         return JsonResponse({'success': False, 'error': 'Ya existe un tipo con ese nombre.'}, status=400)
 
-    base_codigo = slugify(nombre)
+    orden_raw = (request.POST.get('orden') or '').strip()
+    orden = 0
+    if orden_raw:
+        try:
+            orden = int(orden_raw)
+        except ValueError:
+            return JsonResponse({'success': False, 'error': 'El orden debe ser numérico.'}, status=400)
+
+    activo_raw = (request.POST.get('activo') or '').strip().lower()
+    activo = activo_raw in {'1', 'true', 'on', 'yes'}
+
+    base_codigo = slugify(nombre) or 'tipo'
     codigo = base_codigo
     contador = 1
     while TipoProcesoCompra.objects.filter(codigo=codigo).exists():
@@ -1258,9 +1270,19 @@ def crear_tipo_proceso(request):
     tipo = TipoProcesoCompra.objects.create(
         nombre=nombre,
         codigo=codigo,
-        activo=True,
+        activo=activo,
+        orden=orden,
     )
-    return JsonResponse({'success': True, 'id': tipo.id, 'nombre': tipo.nombre, 'codigo': tipo.codigo})
+    return JsonResponse({
+        'success': True,
+        'tipo': {
+            'id': tipo.id,
+            'nombre': tipo.nombre,
+            'codigo': tipo.codigo,
+            'activo': tipo.activo,
+            'orden': tipo.orden,
+        },
+    })
 
 
 @login_required
@@ -1275,26 +1297,44 @@ def pasos_tipo_proceso(request, tipo_id):
 
 
 @login_required
-@admin_only_config
+@require_POST
 def crear_paso_tipo_proceso(request, tipo_id):
+    if not is_admin(request.user):
+        return json_forbidden()
     tipo = get_object_or_404(TipoProcesoCompra, pk=tipo_id)
-    if request.method == 'POST':
-        data = request.POST.copy()
-        data['tipo_proceso'] = tipo.id
-        form = ProcesoCompraPasoForm(data)
-        if form.is_valid():
-            form.save()
-            messages.success(request, 'Paso creado correctamente.')
-            return redirect('scompras:pasos_tipo_proceso', tipo_id=tipo.id)
-    else:
-        form = ProcesoCompraPasoForm(initial={'tipo_proceso': tipo.id})
+    numero_raw = (request.POST.get('numero') or '').strip()
+    titulo = (request.POST.get('titulo') or '').strip()
+    duracion_referencia = (request.POST.get('duracion_referencia') or '').strip()
 
-    return render(request, 'scompras/procesos/paso_form.html', {
-        'form': form,
-        'tipo': tipo,
-        'titulo': 'Nuevo paso de proceso',
-        'volver_url': reverse('scompras:pasos_tipo_proceso', args=[tipo.id]),
-        'ocultar_tipo': True,
+    if not numero_raw:
+        return JsonResponse({'success': False, 'error': 'El número es obligatorio.'}, status=400)
+    try:
+        numero = int(numero_raw)
+    except ValueError:
+        return JsonResponse({'success': False, 'error': 'El número debe ser válido.'}, status=400)
+    if numero <= 0:
+        return JsonResponse({'success': False, 'error': 'El número debe ser mayor que cero.'}, status=400)
+    if not titulo:
+        return JsonResponse({'success': False, 'error': 'El título es obligatorio.'}, status=400)
+    if ProcesoCompraPaso.objects.filter(tipo_proceso=tipo, numero=numero).exists():
+        return JsonResponse({'success': False, 'error': 'Ya existe un paso con ese número.'}, status=400)
+
+    paso = ProcesoCompraPaso.objects.create(
+        tipo_proceso=tipo,
+        numero=numero,
+        titulo=titulo,
+        duracion_referencia=duracion_referencia,
+        activo=True,
+    )
+    return JsonResponse({
+        'success': True,
+        'paso': {
+            'id': paso.id,
+            'numero': paso.numero,
+            'titulo': paso.titulo,
+            'duracion_referencia': paso.duracion_referencia,
+            'activo': paso.activo,
+        },
     })
 
 

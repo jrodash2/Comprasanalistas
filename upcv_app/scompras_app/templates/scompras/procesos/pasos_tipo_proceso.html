@@ -14,7 +14,7 @@
             </div>
             <div class="d-flex gap-2">
               <a class="btn btn-outline-secondary btn-sm" href="{% url 'scompras:lista_tipos_proceso' %}">Volver</a>
-              <a class="btn btn-primary btn-sm" href="{% url 'scompras:crear_paso_tipo_proceso' tipo.id %}">+ Nuevo paso</a>
+              <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalNuevoPaso" type="button">+ Nuevo paso</button>
             </div>
           </div>
 
@@ -62,6 +62,36 @@
     </div>
   </div>
 </div>
+
+<div class="modal fade" id="modalNuevoPaso" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Nuevo paso</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-danger d-none" id="errPaso"></div>
+        <div class="mb-3">
+          <label class="form-label">Número</label>
+          <input type="number" class="form-control" id="nuevoPasoNumero" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Título</label>
+          <input type="text" class="form-control" id="nuevoPasoTitulo" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Duración referencia</label>
+          <input type="text" class="form-control" id="nuevoPasoDuracion" placeholder="Opcional">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="btnGuardarPaso">Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -97,6 +127,79 @@
           .catch(() => window.location.reload());
       });
     });
+
+    const btnGuardarPaso = document.getElementById('btnGuardarPaso');
+    const inputNumero = document.getElementById('nuevoPasoNumero');
+    const inputTitulo = document.getElementById('nuevoPasoTitulo');
+    const inputDuracion = document.getElementById('nuevoPasoDuracion');
+    const errorBox = document.getElementById('errPaso');
+    const modalElement = document.getElementById('modalNuevoPaso');
+    const modal = modalElement ? new bootstrap.Modal(modalElement) : null;
+
+    function resetModal() {
+      if (inputNumero) inputNumero.value = '';
+      if (inputTitulo) inputTitulo.value = '';
+      if (inputDuracion) inputDuracion.value = '';
+      if (errorBox) {
+        errorBox.textContent = '';
+        errorBox.classList.add('d-none');
+      }
+    }
+
+    if (modalElement) {
+      modalElement.addEventListener('show.bs.modal', resetModal);
+    }
+
+    if (btnGuardarPaso) {
+      btnGuardarPaso.addEventListener('click', () => {
+        const numero = inputNumero ? inputNumero.value.trim() : '';
+        const titulo = inputTitulo ? inputTitulo.value.trim() : '';
+        const duracion_referencia = inputDuracion ? inputDuracion.value.trim() : '';
+        if (!numero || !titulo) {
+          if (errorBox) {
+            errorBox.textContent = 'Número y título son obligatorios.';
+            errorBox.classList.remove('d-none');
+          }
+          return;
+        }
+        btnGuardarPaso.disabled = true;
+        const originalText = btnGuardarPaso.textContent;
+        btnGuardarPaso.textContent = 'Guardando...';
+        fetch("{% url 'scompras:crear_paso_tipo_proceso' tipo.id %}", {
+          method: 'POST',
+          headers: {
+            'X-CSRFToken': csrftoken,
+            'X-Requested-With': 'XMLHttpRequest',
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: new URLSearchParams({ numero, titulo, duracion_referencia }),
+        })
+          .then((response) => response.json())
+          .then((data) => {
+            if (data.success) {
+              if (modal) {
+                modal.hide();
+              }
+              window.location.reload();
+            } else {
+              if (errorBox) {
+                errorBox.textContent = data.error || 'No se pudo crear el paso.';
+                errorBox.classList.remove('d-none');
+              }
+            }
+          })
+          .catch(() => {
+            if (errorBox) {
+              errorBox.textContent = 'Ocurrió un error inesperado.';
+              errorBox.classList.remove('d-none');
+            }
+          })
+          .finally(() => {
+            btnGuardarPaso.disabled = false;
+            btnGuardarPaso.textContent = originalText;
+          });
+      });
+    }
   })();
 </script>
 {% endblock %}
