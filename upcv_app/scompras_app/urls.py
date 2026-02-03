@@ -1,6 +1,7 @@
 from django.urls import path
 from django.contrib.auth import views as auth_views
 from . import views
+from django.urls import reverse_lazy
 
 
 app_name = 'scompras'
@@ -116,16 +117,25 @@ urlpatterns = [
     path('asignar-usuario-departamento/', views.asignar_departamento_usuario, name='asignar_departamento'),
     path('eliminar-asignacion/<int:usuario_id>/<int:departamento_id>/<int:seccion_id>/', views.eliminar_asignacion, name='eliminar_asignacion'),
     path('editar_institucion/', views.editar_institucion, name='editar_institucion'),
-    # Cambiar contraseña
-    path('cambiar-contrasena/', auth_views.PasswordChangeView.as_view(
-        template_name='scompras/password_change_form.html',
-        success_url='/cambiar-contrasena/hecho/'  # Redirección tras éxito
-    ), name='password_change'),
-
-    path('cambiar-contrasena/hecho/', auth_views.PasswordChangeDoneView.as_view(
-        template_name='scompras/password_change_done.html'
-    ), name='password_change_done'),
     
+# Cambiar contraseña
+path(
+    'cambiar-contrasena/',
+    auth_views.PasswordChangeView.as_view(
+        template_name='scompras/password_change_form.html',
+        success_url=reverse_lazy('scompras:password_change_done')  # aquí el namespace
+    ),
+    name='password_change'
+),
+
+path(
+    'cambiar-contrasena/hecho/',
+    auth_views.PasswordChangeDoneView.as_view(
+        template_name='scompras/password_change_done.html'
+    ),
+    name='password_change_done'
+),
+
   
 
 
