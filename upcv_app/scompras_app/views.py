@@ -1004,6 +1004,9 @@ class SolicitudCompraDetailView(DetailView):
                 Q(activo=True) | Q(pk=solicitud.tipo_proceso_id)
             ).order_by('orden', 'nombre')
         context['tipos_proceso'] = tipos_qs
+        context['tipos_proceso_disponibles'] = tipos_qs
+        context['tipo_proceso_actual'] = solicitud.tipo_proceso
+        context['subtipo_baja_actual'] = solicitud.subtipo_baja_cuantia
         if es_admin:
             context['lista_analistas'] = User.objects.filter(
                 groups__name__iexact='analista'
@@ -1042,6 +1045,57 @@ def asignar_analista_solicitud(request, solicitud_id):
         solicitud.save(update_fields=['analista_asignado', 'fecha_asignacion_analista', 'paso_actual'])
 
     return JsonResponse({"success": True})
+
+
+@login_required
+@require_POST
+def asignar_tipo_proceso_solicitud(request, solicitud_id):
+    if not is_admin(request.user):
+        return json_forbidden()
+
+    solicitud = get_object_or_404(SolicitudCompra, pk=solicitud_id)
+    tipo_id = request.POST.get('tipo_proceso_id')
+    if not tipo_id:
+        return JsonResponse({"success": False, "error": "Tipo de proceso requerido"}, status=400)
+
+    tipo_proceso = TipoProcesoCompra.objects.filter(pk=tipo_id).first()
+    if not tipo_proceso:
+        return JsonResponse({"success": False, "error": "Tipo de proceso inválido"}, status=400)
+
+    subtipo_baja_cuantia = (request.POST.get('subtipo_baja_cuantia') or '').strip()
+    if tipo_proceso.codigo == 'baja-cuantia':
+        subtipo_validos = {valor for valor, _ in SolicitudCompra.SUBTIPO_BAJA_CUANTIA_CHOICES}
+        if subtipo_baja_cuantia not in subtipo_validos:
+            return JsonResponse({"success": False, "error": "Subtipo de baja cuantía requerido"}, status=400)
+    else:
+        subtipo_baja_cuantia = None
+
+    tipo_cambiado = solicitud.tipo_proceso_id != tipo_proceso.id
+    subtipo_cambiado = solicitud.subtipo_baja_cuantia != subtipo_baja_cuantia
+
+    with transaction.atomic():
+        solicitud.tipo_proceso = tipo_proceso
+        solicitud.subtipo_baja_cuantia = subtipo_baja_cuantia
+        solicitud.paso_actual = 1
+        solicitud.save(update_fields=['tipo_proceso', 'subtipo_baja_cuantia', 'paso_actual'])
+
+        if tipo_cambiado or (tipo_proceso.codigo == 'baja-cuantia' and subtipo_cambiado):
+            SolicitudPasoEstado.objects.filter(solicitud=solicitud).delete()
+
+        pasos_catalogo = obtener_pasos_catalogo(solicitud)
+        for paso in pasos_catalogo:
+            SolicitudPasoEstado.objects.get_or_create(
+                solicitud=solicitud,
+                paso=paso,
+                defaults={'completado': False},
+            )
+
+    return JsonResponse({
+        "success": True,
+        "tipo_proceso_display": tipo_proceso.nombre,
+        "subtipo_display": solicitud.get_subtipo_baja_cuantia_display() if subtipo_baja_cuantia else "",
+        "paso_actual": 1,
+    })
 
 
 @login_required

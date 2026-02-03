@@ -64,6 +64,11 @@ urlpatterns = [
     path('ajax/cargar_subproductos/', views.ajax_cargar_subproductos, name='ajax_cargar_subproductos'),
     path('solicitud/<int:pk>/',views.SolicitudCompraDetailView.as_view(), name='detalle_solicitud'),
     path('solicitud/<int:solicitud_id>/asignar-analista/', views.asignar_analista_solicitud, name='asignar_analista_solicitud'),
+    path(
+        'solicitud/<int:solicitud_id>/asignar-tipo-proceso/',
+        views.asignar_tipo_proceso_solicitud,
+        name='asignar_tipo_proceso_solicitud',
+    ),
     path('solicitud/<int:solicitud_id>/pasos/<int:paso_id>/toggle/', views.toggle_paso_solicitud, name='toggle_paso_solicitud'),
     path('solicitud/<int:solicitud_id>/set-paso-actual/', views.set_paso_actual_solicitud, name='set_paso_actual_solicitud'),
     path('tipos-proceso/', views.lista_tipos_proceso, name='lista_tipos_proceso'),
