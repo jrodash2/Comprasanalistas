@@ -200,8 +200,8 @@
             <span>Pendiente</span>
           </div>
         </div>
-      {% elif tipo_proceso_display == 'Sin asignar' %}
-        <p class="text-muted mb-0">Tipo de proceso: Sin asignar</p>
+      {% elif not solicitud.tipo_proceso %}
+        <p class="text-muted mb-0">Tipo de proceso en análisis</p>
       {% else %}
         <p class="text-muted mb-0">No hay pasos configurados para este proceso.</p>
       {% endif %}
@@ -260,9 +260,9 @@
               <label class="form-label">Subtipo baja cuantía</label>
               <select class="form-select" id="selectSubtipoBajaCuantiaAsignar">
                 <option value="">Seleccione un subtipo</option>
-                {% for subtipo, label in solicitud.SUBTIPO_BAJA_CUANTIA_CHOICES %}
-                  <option value="{{ subtipo }}" {% if subtipo_baja_actual == subtipo %}selected{% endif %}>
-                    {{ label }}
+                {% for subtipo in subtipos_baja_cuantia %}
+                  <option value="{{ subtipo.codigo }}" {% if subtipo_baja_actual == subtipo.codigo %}selected{% endif %}>
+                    {{ subtipo.nombre }}
                   </option>
                 {% endfor %}
               </select>
