@@ -73,6 +73,7 @@ urlpatterns = [
     path('solicitud/<int:solicitud_id>/set-paso-actual/', views.set_paso_actual_solicitud, name='set_paso_actual_solicitud'),
     path('tipos-proceso/', views.lista_tipos_proceso, name='lista_tipos_proceso'),
     path('tipos-proceso/crear/', views.crear_tipo_proceso, name='crear_tipo_proceso'),
+    path('tipos-proceso/guardar/', views.guardar_tipo_proceso, name='guardar_tipo_proceso'),
     path('tipos-proceso/<int:tipo_id>/pasos/', views.pasos_tipo_proceso, name='pasos_tipo_proceso'),
     path('tipos-proceso/<int:tipo_id>/pasos/crear/', views.crear_paso_tipo_proceso, name='crear_paso_tipo_proceso'),
     path('pasos/<int:paso_id>/editar/', views.editar_paso_tipo_proceso, name='editar_paso_tipo_proceso'),

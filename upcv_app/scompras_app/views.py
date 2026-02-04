@@ -992,10 +992,22 @@ class SolicitudCompraDetailView(DetailView):
         context['paso_actual_num'] = solicitud.paso_actual
         context['analista_asignado'] = solicitud.analista_asignado
         context['es_analista_asignado'] = es_analista_asignado
-        context['puede_ver_timeline'] = (
-            (es_admin or es_scompras or es_presupuesto_usuario or es_analista_asignado)
-            and solicitud.tipo_proceso is not None
+        context['puede_ver_proceso_compra'] = (
+            es_admin or es_scompras or es_analista_asignado
         )
+        context['tipo_proceso_display'] = (
+            solicitud.tipo_proceso.nombre
+            if solicitud.tipo_proceso
+            else 'En análisis'
+        )
+        context['subtipo_baja_display'] = (
+            solicitud.get_subtipo_baja_cuantia_display()
+            if solicitud.tipo_proceso
+            and solicitud.tipo_proceso.codigo == 'baja-cuantia'
+            and solicitud.subtipo_baja_cuantia
+            else ''
+        )
+        context['mostrar_timeline'] = bool(solicitud.tipo_proceso) and bool(pasos_catalogo)
         context['puede_marcar_pasos'] = es_admin or es_analista_asignado
         context['es_admin_timeline'] = es_admin
         tipos_qs = TipoProcesoCompra.objects.filter(activo=True).order_by('orden', 'nombre')
@@ -1335,6 +1347,61 @@ def crear_tipo_proceso(request):
             'codigo': tipo.codigo,
             'activo': tipo.activo,
             'orden': tipo.orden,
+        },
+    })
+
+
+@login_required
+@admin_only_config
+@require_POST
+def guardar_tipo_proceso(request):
+    if not is_admin(request.user):
+        return json_forbidden()
+    tipo_id = (request.POST.get('id') or '').strip()
+    nombre = (request.POST.get('nombre') or '').strip()
+    codigo_raw = (request.POST.get('codigo') or '').strip()
+    activo_raw = (request.POST.get('activo') or '').strip().lower()
+    activo = activo_raw in {'1', 'true', 'on', 'yes'}
+
+    if not nombre:
+        return JsonResponse({'success': False, 'error': 'El nombre es obligatorio.'}, status=400)
+    codigo = slugify(codigo_raw or nombre)
+    if not codigo:
+        return JsonResponse({'success': False, 'error': 'El código es obligatorio.'}, status=400)
+
+    tipo = None
+    if tipo_id:
+        tipo = get_object_or_404(TipoProcesoCompra, pk=tipo_id)
+
+    nombre_qs = TipoProcesoCompra.objects.filter(nombre__iexact=nombre)
+    codigo_qs = TipoProcesoCompra.objects.filter(codigo=codigo)
+    if tipo:
+        nombre_qs = nombre_qs.exclude(pk=tipo.id)
+        codigo_qs = codigo_qs.exclude(pk=tipo.id)
+    if nombre_qs.exists():
+        return JsonResponse({'success': False, 'error': 'Ya existe un tipo con ese nombre.'}, status=400)
+    if codigo_qs.exists():
+        return JsonResponse({'success': False, 'error': 'Ya existe un tipo con ese código.'}, status=400)
+
+    if not tipo:
+        tipo = TipoProcesoCompra.objects.create(
+            nombre=nombre,
+            codigo=codigo,
+            activo=activo,
+        )
+    else:
+        tipo.nombre = nombre
+        tipo.codigo = codigo
+        tipo.activo = activo
+        tipo.save(update_fields=['nombre', 'codigo', 'activo'])
+
+    return JsonResponse({
+        'success': True,
+        'tipo': {
+            'id': tipo.id,
+            'nombre': tipo.nombre,
+            'codigo': tipo.codigo,
+            'activo': tipo.activo,
         },
     })
 

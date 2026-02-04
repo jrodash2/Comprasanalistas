@@ -11,7 +11,9 @@
           <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
             <h4 class="mb-0">Tipos de proceso</h4>
             {% if es_admin or request.user.is_superuser %}
-              <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalNuevoTipo" type="button">+ Nuevo tipo</button>
+              <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalTipoProceso" type="button">
+                + Nuevo tipo de proceso
+              </button>
             {% endif %}
           </div>
 
@@ -38,6 +40,20 @@
                       {% endif %}
                     </td>
                     <td class="text-end">
+                      {% if es_admin or request.user.is_superuser %}
+                        <button
+                          class="btn btn-sm btn-outline-secondary btn-editar-tipo"
+                          data-id="{{ tipo.id }}"
+                          data-nombre="{{ tipo.nombre }}"
+                          data-codigo="{{ tipo.codigo }}"
+                          data-activo="{{ tipo.activo|yesno:'1,0' }}"
+                          type="button"
+                          data-bs-toggle="modal"
+                          data-bs-target="#modalTipoProceso"
+                        >
+                          Editar
+                        </button>
+                      {% endif %}
                       <a class="btn btn-sm btn-outline-primary" href="{% url 'scompras:pasos_tipo_proceso' tipo.id %}">
                         Administrar pasos
                       </a>
@@ -57,26 +73,28 @@
   </div>
 </div>
 
-<div class="modal fade" id="modalNuevoTipo" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="modalTipoProceso" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">Nuevo tipo de proceso</h5>
+        <h5 class="modal-title" id="modalTipoProcesoTitulo">Nuevo tipo de proceso</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
       </div>
       <div class="modal-body">
+        <div class="alert alert-success d-none" id="msgTipo"></div>
         <div class="alert alert-danger d-none" id="errTipo"></div>
+        <input type="hidden" id="tipoProcesoId">
         <div class="mb-3">
           <label class="form-label">Nombre</label>
-          <input type="text" class="form-control" id="nuevoTipoNombre" placeholder="Nombre del tipo" required>
+          <input type="text" class="form-control" id="tipoProcesoNombre" placeholder="Nombre del tipo" required>
         </div>
         <div class="mb-3">
-          <label class="form-label">Orden</label>
-          <input type="number" class="form-control" id="nuevoTipoOrden" placeholder="0">
+          <label class="form-label">Código (slug)</label>
+          <input type="text" class="form-control" id="tipoProcesoCodigo" placeholder="codigo-del-tipo" required>
         </div>
         <div class="form-check">
-          <input class="form-check-input" type="checkbox" id="nuevoTipoActivo" checked>
-          <label class="form-check-label" for="nuevoTipoActivo">Activo</label>
+          <input class="form-check-input" type="checkbox" id="tipoProcesoActivo" checked>
+          <label class="form-check-label" for="tipoProcesoActivo">Activo</label>
         </div>
       </div>
       <div class="modal-footer">
@@ -108,35 +126,55 @@
     }
     const csrftoken = getCookie('csrftoken');
     const btnGuardar = document.getElementById('btnGuardarTipoProceso');
-    const inputNombre = document.getElementById('nuevoTipoNombre');
-    const inputOrden = document.getElementById('nuevoTipoOrden');
-    const inputActivo = document.getElementById('nuevoTipoActivo');
+    const inputId = document.getElementById('tipoProcesoId');
+    const inputNombre = document.getElementById('tipoProcesoNombre');
+    const inputCodigo = document.getElementById('tipoProcesoCodigo');
+    const inputActivo = document.getElementById('tipoProcesoActivo');
     const errorBox = document.getElementById('errTipo');
-    const modalElement = document.getElementById('modalNuevoTipo');
+    const successBox = document.getElementById('msgTipo');
+    const modalElement = document.getElementById('modalTipoProceso');
     const modal = modalElement ? new bootstrap.Modal(modalElement) : null;
+    const modalTitle = document.getElementById('modalTipoProcesoTitulo');
 
     function resetModal() {
+      if (inputId) inputId.value = '';
       if (inputNombre) inputNombre.value = '';
-      if (inputOrden) inputOrden.value = '';
+      if (inputCodigo) inputCodigo.value = '';
       if (inputActivo) inputActivo.checked = true;
+      if (modalTitle) modalTitle.textContent = 'Nuevo tipo de proceso';
       if (errorBox) {
         errorBox.textContent = '';
         errorBox.classList.add('d-none');
       }
+      if (successBox) {
+        successBox.textContent = '';
+        successBox.classList.add('d-none');
+      }
     }
 
     if (modalElement) {
-      modalElement.addEventListener('show.bs.modal', resetModal);
+      modalElement.addEventListener('show.bs.modal', (event) => {
+        resetModal();
+        const button = event.relatedTarget;
+        if (button && button.classList.contains('btn-editar-tipo')) {
+          if (inputId) inputId.value = button.getAttribute('data-id') || '';
+          if (inputNombre) inputNombre.value = button.getAttribute('data-nombre') || '';
+          if (inputCodigo) inputCodigo.value = button.getAttribute('data-codigo') || '';
+          if (inputActivo) inputActivo.checked = button.getAttribute('data-activo') === '1';
+          if (modalTitle) modalTitle.textContent = 'Editar tipo de proceso';
+        }
+      });
     }
 
     if (btnGuardar) {
       btnGuardar.addEventListener('click', () => {
+        const id = inputId ? inputId.value.trim() : '';
         const nombre = inputNombre ? inputNombre.value.trim() : '';
-        const orden = inputOrden ? inputOrden.value.trim() : '';
+        const codigo = inputCodigo ? inputCodigo.value.trim() : '';
         const activo = inputActivo && inputActivo.checked ? '1' : '';
-        if (!nombre) {
+        if (!nombre || !codigo) {
           if (errorBox) {
-            errorBox.textContent = 'El nombre es obligatorio.';
+            errorBox.textContent = 'Nombre y código son obligatorios.';
             errorBox.classList.remove('d-none');
           }
           return;
@@ -144,22 +182,28 @@
         btnGuardar.disabled = true;
         const originalText = btnGuardar.textContent;
         btnGuardar.textContent = 'Guardando...';
-        fetch("{% url 'scompras:crear_tipo_proceso' %}", {
+        fetch("{% url 'scompras:guardar_tipo_proceso' %}", {
           method: 'POST',
           headers: {
             'X-CSRFToken': csrftoken,
             'X-Requested-With': 'XMLHttpRequest',
             'Content-Type': 'application/x-www-form-urlencoded',
           },
-          body: new URLSearchParams({ nombre, orden, activo }),
+          body: new URLSearchParams({ id, nombre, codigo, activo }),
         })
           .then((response) => response.json())
           .then((data) => {
             if (data.success) {
-              if (modal) {
-                modal.hide();
+              if (successBox) {
+                successBox.textContent = 'Tipo guardado correctamente.';
+                successBox.classList.remove('d-none');
               }
-              window.location.reload();
+              setTimeout(() => {
+                if (modal) {
+                  modal.hide();
+                }
+                window.location.reload();
+              }, 700);
             } else {
               if (errorBox) {
                 errorBox.textContent = data.error || 'No se pudo crear el tipo.';
