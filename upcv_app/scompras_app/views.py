@@ -1032,7 +1032,7 @@ class SolicitudCompraDetailView(DetailView):
         context['tipo_proceso_display'] = (
             solicitud.tipo_proceso.nombre
             if solicitud.tipo_proceso
-            else 'En análisis'
+            else 'Sin asignar'
         )
         context['subtipo_baja_display'] = (
             solicitud.get_subtipo_baja_cuantia_display()
