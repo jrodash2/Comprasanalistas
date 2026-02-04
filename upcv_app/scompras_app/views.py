@@ -1035,7 +1035,7 @@ class SolicitudCompraDetailView(DetailView):
             else 'En análisis'
         )
         context['subtipo_baja_display'] = (
-            obtener_subtipo_display(solicitud.tipo_proceso, solicitud.subtipo_baja_cuantia)
+            solicitud.get_subtipo_baja_cuantia_display()
             if solicitud.tipo_proceso
             and solicitud.tipo_proceso.codigo == 'baja-cuantia'
             and solicitud.subtipo_baja_cuantia
@@ -1444,64 +1444,6 @@ def guardar_tipo_proceso(request):
             'nombre': tipo.nombre,
             'codigo': tipo.codigo,
             'activo': tipo.activo,
-        },
-    })
-
-
-@login_required
-@admin_only_config
-@require_POST
-def guardar_subtipo_proceso(request):
-    if not is_admin(request.user):
-        return json_forbidden()
-    subtipo_id = (request.POST.get('id') or '').strip()
-    tipo_id = (request.POST.get('tipo_id') or '').strip()
-    nombre = (request.POST.get('nombre') or '').strip()
-    codigo_raw = (request.POST.get('codigo') or '').strip()
-    activo_raw = (request.POST.get('activo') or '').strip().lower()
-    activo = activo_raw in {'1', 'true', 'on', 'yes'}
-
-    if not tipo_id:
-        return JsonResponse({'success': False, 'error': 'El tipo es obligatorio.'}, status=400)
-    if not nombre:
-        return JsonResponse({'success': False, 'error': 'El nombre es obligatorio.'}, status=400)
-    tipo = get_object_or_404(TipoProcesoCompra, pk=tipo_id)
-    codigo = slugify(codigo_raw or nombre)
-    if not codigo:
-        return JsonResponse({'success': False, 'error': 'El código es obligatorio.'}, status=400)
-
-    subtipo = None
-    if subtipo_id:
-        subtipo = get_object_or_404(SubtipoProcesoCompra, pk=subtipo_id)
-
-    codigo_qs = SubtipoProcesoCompra.objects.filter(tipo=tipo, codigo=codigo)
-    if subtipo:
-        codigo_qs = codigo_qs.exclude(pk=subtipo.id)
-    if codigo_qs.exists():
-        return JsonResponse({'success': False, 'error': 'Ya existe un subtipo con ese código.'}, status=400)
-
-    if not subtipo:
-        subtipo = SubtipoProcesoCompra.objects.create(
-            tipo=tipo,
-            nombre=nombre,
-            codigo=codigo,
-            activo=activo,
-        )
-    else:
-        subtipo.tipo = tipo
-        subtipo.nombre = nombre
-        subtipo.codigo = codigo
-        subtipo.activo = activo
-        subtipo.save(update_fields=['tipo', 'nombre', 'codigo', 'activo'])
-
-    return JsonResponse({
-        'success': True,
-        'subtipo': {
-            'id': subtipo.id,
-            'tipo_id': subtipo.tipo_id,
-            'nombre': subtipo.nombre,
-            'codigo': subtipo.codigo,
-            'activo': subtipo.activo,
         },
     })
 
