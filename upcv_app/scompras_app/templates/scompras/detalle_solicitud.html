@@ -706,8 +706,8 @@
               <label for="id_subtipo_baja_cuantia" class="form-label fw-semibold">Subtipo baja cuantía:</label>
               <select id="id_subtipo_baja_cuantia" name="subtipo_baja_cuantia" class="form-select">
                 <option value="">Seleccione un subtipo</option>
-                {% for subtipo, label in solicitud.SUBTIPO_BAJA_CUANTIA_CHOICES %}
-                  <option value="{{ subtipo }}" {% if solicitud.subtipo_baja_cuantia == subtipo %}selected{% endif %}>{{ label }}</option>
+                {% for subtipo in subtipos_baja_cuantia %}
+                  <option value="{{ subtipo.codigo }}" {% if solicitud.subtipo_baja_cuantia == subtipo.codigo %}selected{% endif %}>{{ subtipo.nombre }}</option>
                 {% endfor %}
               </select>
             </div>

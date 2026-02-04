@@ -67,6 +67,24 @@ class TipoProcesoCompra(models.Model):
         return self.nombre
 
 
+class SubtipoProcesoCompra(models.Model):
+    tipo = models.ForeignKey(
+        'TipoProcesoCompra',
+        related_name='subtipos',
+        on_delete=models.CASCADE,
+    )
+    nombre = models.CharField(max_length=100)
+    codigo = models.SlugField(max_length=40)
+    activo = models.BooleanField(default=True)
+
+    class Meta:
+        unique_together = ('tipo', 'codigo')
+        ordering = ['tipo', 'nombre']
+
+    def __str__(self):
+        return f'{self.tipo.nombre} - {self.nombre}'
+
+
 class SolicitudCompra(models.Model):
     ESTADOS = [
         ('Creada', 'Creada'),

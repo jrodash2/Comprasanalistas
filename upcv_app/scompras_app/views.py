@@ -50,6 +50,7 @@ from .models import (
     ProcesoCompraPaso,
     SolicitudPasoEstado,
     TipoProcesoCompra,
+    SubtipoProcesoCompra,
     Subproducto,
     UsuarioDepartamento,
     Institucion,
@@ -174,6 +175,39 @@ BAJA_CUANTIA_PASOS_POR_SUBTIPO = {
         'CIERRE DE EXPEDIENTE',
     ],
 }
+
+
+def obtener_subtipos_baja_cuantia():
+    tipo_baja = TipoProcesoCompra.objects.filter(codigo='baja-cuantia').first()
+    if tipo_baja:
+        subtipos = list(
+            SubtipoProcesoCompra.objects.filter(tipo=tipo_baja, activo=True).order_by('nombre')
+        )
+        if subtipos:
+            return [
+                {'codigo': subtipo.codigo, 'nombre': subtipo.nombre}
+                for subtipo in subtipos
+            ]
+    return [
+        {'codigo': codigo, 'nombre': nombre}
+        for codigo, nombre in SolicitudCompra.SUBTIPO_BAJA_CUANTIA_CHOICES
+    ]
+
+
+def obtener_subtipo_display(tipo_proceso, subtipo_codigo):
+    if not subtipo_codigo:
+        return ''
+    if tipo_proceso:
+        subtipo = SubtipoProcesoCompra.objects.filter(
+            tipo=tipo_proceso,
+            codigo=subtipo_codigo,
+        ).first()
+        if subtipo:
+            return subtipo.nombre
+    return dict(SolicitudCompra.SUBTIPO_BAJA_CUANTIA_CHOICES).get(
+        subtipo_codigo,
+        subtipo_codigo,
+    )
 
 
 def obtener_pasos_catalogo(solicitud):
@@ -1019,6 +1053,7 @@ class SolicitudCompraDetailView(DetailView):
         context['tipos_proceso_disponibles'] = tipos_qs
         context['tipo_proceso_actual'] = solicitud.tipo_proceso
         context['subtipo_baja_actual'] = solicitud.subtipo_baja_cuantia
+        context['subtipos_baja_cuantia'] = obtener_subtipos_baja_cuantia()
         if es_admin:
             context['lista_analistas'] = User.objects.filter(
                 groups__name__iexact='analista'
@@ -1076,9 +1111,14 @@ def asignar_tipo_proceso_solicitud(request, solicitud_id):
 
     subtipo_baja_cuantia = (request.POST.get('subtipo_baja_cuantia') or '').strip()
     if tipo_proceso.codigo == 'baja-cuantia':
-        subtipo_validos = {valor for valor, _ in SolicitudCompra.SUBTIPO_BAJA_CUANTIA_CHOICES}
-        if subtipo_baja_cuantia not in subtipo_validos:
-            return JsonResponse({"success": False, "error": "Subtipo de baja cuantía requerido"}, status=400)
+        subtipos_qs = SubtipoProcesoCompra.objects.filter(tipo=tipo_proceso, activo=True)
+        if subtipos_qs.exists():
+            if not subtipos_qs.filter(codigo=subtipo_baja_cuantia).exists():
+                return JsonResponse({"success": False, "error": "Subtipo de baja cuantía requerido"}, status=400)
+        else:
+            subtipo_validos = {valor for valor, _ in SolicitudCompra.SUBTIPO_BAJA_CUANTIA_CHOICES}
+            if subtipo_baja_cuantia not in subtipo_validos:
+                return JsonResponse({"success": False, "error": "Subtipo de baja cuantía requerido"}, status=400)
     else:
         subtipo_baja_cuantia = None
 
@@ -1105,7 +1145,9 @@ def asignar_tipo_proceso_solicitud(request, solicitud_id):
     return JsonResponse({
         "success": True,
         "tipo_proceso_display": tipo_proceso.nombre,
-        "subtipo_display": solicitud.get_subtipo_baja_cuantia_display() if subtipo_baja_cuantia else "",
+        "subtipo_display": obtener_subtipo_display(tipo_proceso, subtipo_baja_cuantia)
+        if subtipo_baja_cuantia
+        else "",
         "paso_actual": 1,
     })
 
@@ -1414,6 +1456,7 @@ def pasos_tipo_proceso(request, tipo_id):
     return render(request, 'scompras/procesos/pasos_tipo_proceso.html', {
         'tipo': tipo,
         'pasos': pasos,
+        'subtipos': tipo.subtipos.order_by('nombre'),
     })
 
 
