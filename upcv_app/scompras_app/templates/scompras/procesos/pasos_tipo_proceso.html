@@ -15,7 +15,59 @@
             </div>
             <div class="d-flex gap-2">
               <a class="btn btn-outline-secondary btn-sm" href="{% url 'scompras:lista_tipos_proceso' %}">Volver</a>
+              <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalSubtipo" type="button">
+                + Nuevo subtipo
+              </button>
               <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalNuevoPaso" type="button">+ Nuevo paso</button>
+            </div>
+          </div>
+
+          <div class="mb-4">
+            <h5 class="mb-2">Subtipos</h5>
+            <div class="table-responsive">
+              <table class="table table-striped align-middle">
+                <thead>
+                  <tr>
+                    <th>Nombre</th>
+                    <th>Código</th>
+                    <th>Activo</th>
+                    <th class="text-end">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for subtipo in subtipos %}
+                    <tr>
+                      <td>{{ subtipo.nombre }}</td>
+                      <td>{{ subtipo.codigo }}</td>
+                      <td>
+                        {% if subtipo.activo %}
+                          <span class="badge bg-success">Activo</span>
+                        {% else %}
+                          <span class="badge bg-secondary">Inactivo</span>
+                        {% endif %}
+                      </td>
+                      <td class="text-end">
+                        <button
+                          class="btn btn-sm btn-outline-secondary btn-editar-subtipo"
+                          type="button"
+                          data-id="{{ subtipo.id }}"
+                          data-nombre="{{ subtipo.nombre }}"
+                          data-codigo="{{ subtipo.codigo }}"
+                          data-activo="{{ subtipo.activo|yesno:'1,0' }}"
+                          data-bs-toggle="modal"
+                          data-bs-target="#modalSubtipo"
+                        >
+                          Editar
+                        </button>
+                      </td>
+                    </tr>
+                  {% empty %}
+                    <tr>
+                      <td colspan="4" class="text-center text-muted">No hay subtipos configurados.</td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
             </div>
           </div>
 
@@ -89,6 +141,43 @@
       <div class="modal-footer">
         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
         <button type="button" class="btn btn-primary" id="btnGuardarPaso">Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modalSubtipo" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalSubtipoTitulo">Nuevo subtipo</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-success d-none" id="msgSubtipo"></div>
+        <div class="alert alert-danger d-none" id="errSubtipo"></div>
+        <input type="hidden" id="subtipoId">
+        <input type="hidden" id="subtipoTipoId" value="{{ tipo.id }}">
+        <div class="mb-3">
+          <label class="form-label">Tipo</label>
+          <input type="text" class="form-control" value="{{ tipo.nombre }}" disabled>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Nombre</label>
+          <input type="text" class="form-control" id="subtipoNombre" placeholder="Nombre del subtipo" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Código (slug)</label>
+          <input type="text" class="form-control" id="subtipoCodigo" placeholder="codigo-subtipo" required>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="subtipoActivo" checked>
+          <label class="form-check-label" for="subtipoActivo">Activo</label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="btnGuardarSubtipo">Guardar</button>
       </div>
     </div>
   </div>
@@ -199,6 +288,107 @@
           .finally(() => {
             btnGuardarPaso.disabled = false;
             btnGuardarPaso.textContent = originalText;
+          });
+      });
+    }
+
+    const btnGuardarSubtipo = document.getElementById('btnGuardarSubtipo');
+    const inputSubtipoId = document.getElementById('subtipoId');
+    const inputSubtipoTipo = document.getElementById('subtipoTipoId');
+    const inputSubtipoNombre = document.getElementById('subtipoNombre');
+    const inputSubtipoCodigo = document.getElementById('subtipoCodigo');
+    const inputSubtipoActivo = document.getElementById('subtipoActivo');
+    const errorSubtipo = document.getElementById('errSubtipo');
+    const successSubtipo = document.getElementById('msgSubtipo');
+    const modalSubtipoElement = document.getElementById('modalSubtipo');
+    const modalSubtipo = modalSubtipoElement ? new bootstrap.Modal(modalSubtipoElement) : null;
+    const modalSubtipoTitulo = document.getElementById('modalSubtipoTitulo');
+
+    function resetModalSubtipo() {
+      if (inputSubtipoId) inputSubtipoId.value = '';
+      if (inputSubtipoNombre) inputSubtipoNombre.value = '';
+      if (inputSubtipoCodigo) inputSubtipoCodigo.value = '';
+      if (inputSubtipoActivo) inputSubtipoActivo.checked = true;
+      if (errorSubtipo) {
+        errorSubtipo.textContent = '';
+        errorSubtipo.classList.add('d-none');
+      }
+      if (successSubtipo) {
+        successSubtipo.textContent = '';
+        successSubtipo.classList.add('d-none');
+      }
+      if (modalSubtipoTitulo) modalSubtipoTitulo.textContent = 'Nuevo subtipo';
+    }
+
+    if (modalSubtipoElement) {
+      modalSubtipoElement.addEventListener('show.bs.modal', (event) => {
+        resetModalSubtipo();
+        const button = event.relatedTarget;
+        if (button && button.classList.contains('btn-editar-subtipo')) {
+          if (inputSubtipoId) inputSubtipoId.value = button.getAttribute('data-id') || '';
+          if (inputSubtipoNombre) inputSubtipoNombre.value = button.getAttribute('data-nombre') || '';
+          if (inputSubtipoCodigo) inputSubtipoCodigo.value = button.getAttribute('data-codigo') || '';
+          if (inputSubtipoActivo) inputSubtipoActivo.checked = button.getAttribute('data-activo') === '1';
+          if (modalSubtipoTitulo) modalSubtipoTitulo.textContent = 'Editar subtipo';
+        }
+      });
+    }
+
+    if (btnGuardarSubtipo) {
+      btnGuardarSubtipo.addEventListener('click', () => {
+        const id = inputSubtipoId ? inputSubtipoId.value.trim() : '';
+        const tipo_id = inputSubtipoTipo ? inputSubtipoTipo.value.trim() : '';
+        const nombre = inputSubtipoNombre ? inputSubtipoNombre.value.trim() : '';
+        const codigo = inputSubtipoCodigo ? inputSubtipoCodigo.value.trim() : '';
+        const activo = inputSubtipoActivo && inputSubtipoActivo.checked ? '1' : '';
+        if (!nombre || !codigo) {
+          if (errorSubtipo) {
+            errorSubtipo.textContent = 'Nombre y código son obligatorios.';
+            errorSubtipo.classList.remove('d-none');
+          }
+          return;
+        }
+        btnGuardarSubtipo.disabled = true;
+        const originalText = btnGuardarSubtipo.textContent;
+        btnGuardarSubtipo.textContent = 'Guardando...';
+        fetch("{% url 'scompras:guardar_subtipo_proceso' %}", {
+          method: 'POST',
+          headers: {
+            'X-CSRFToken': csrftoken,
+            'X-Requested-With': 'XMLHttpRequest',
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: new URLSearchParams({ id, tipo_id, nombre, codigo, activo }),
+        })
+          .then((response) => response.json())
+          .then((data) => {
+            if (data.success) {
+              if (successSubtipo) {
+                successSubtipo.textContent = 'Subtipo guardado correctamente.';
+                successSubtipo.classList.remove('d-none');
+              }
+              setTimeout(() => {
+                if (modalSubtipo) {
+                  modalSubtipo.hide();
+                }
+                window.location.reload();
+              }, 700);
+            } else {
+              if (errorSubtipo) {
+                errorSubtipo.textContent = data.error || 'No se pudo guardar el subtipo.';
+                errorSubtipo.classList.remove('d-none');
+              }
+            }
+          })
+          .catch(() => {
+            if (errorSubtipo) {
+              errorSubtipo.textContent = 'Ocurrió un error inesperado.';
+              errorSubtipo.classList.remove('d-none');
+            }
+          })
+          .finally(() => {
+            btnGuardarSubtipo.disabled = false;
+            btnGuardarSubtipo.textContent = originalText;
           });
       });
     }

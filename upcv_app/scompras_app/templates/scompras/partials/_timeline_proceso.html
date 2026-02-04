@@ -1,6 +1,6 @@
 {% load custom_filters %}
 
-{% if puede_ver_timeline %}
+{% if puede_ver_proceso_compra %}
   <style>
     .timeline-proceso {
       color: #111827;
@@ -56,9 +56,9 @@
         <div>
           <h6 class="mb-1">Proceso de compra</h6>
           <div class="text-muted small">
-            Tipo: {{ solicitud.tipo_proceso.nombre }}
-            {% if solicitud.tipo_proceso and solicitud.tipo_proceso.codigo == 'baja-cuantia' and solicitud.subtipo_baja_cuantia %}
-              · {{ solicitud.get_subtipo_baja_cuantia_display }}
+            Tipo: {{ tipo_proceso_display }}
+            {% if subtipo_baja_display %}
+              · {{ subtipo_baja_display }}
             {% endif %}
           </div>
           <div class="text-muted small">
@@ -82,7 +82,7 @@
         {% endif %}
       </div>
 
-      {% if pasos_catalogo %}
+      {% if mostrar_timeline %}
         <div class="d-flex flex-wrap gap-2 mt-3">
           {% for paso in pasos_catalogo %}
             {% with estado=pasos_estado_map|dict_get:paso.id %}
@@ -200,6 +200,8 @@
             <span>Pendiente</span>
           </div>
         </div>
+      {% elif not solicitud.tipo_proceso %}
+        <p class="text-muted mb-0">Tipo de proceso en análisis</p>
       {% else %}
         <p class="text-muted mb-0">No hay pasos configurados para este proceso.</p>
       {% endif %}
@@ -258,9 +260,9 @@
               <label class="form-label">Subtipo baja cuantía</label>
               <select class="form-select" id="selectSubtipoBajaCuantiaAsignar">
                 <option value="">Seleccione un subtipo</option>
-                {% for subtipo, label in solicitud.SUBTIPO_BAJA_CUANTIA_CHOICES %}
-                  <option value="{{ subtipo }}" {% if subtipo_baja_actual == subtipo %}selected{% endif %}>
-                    {{ label }}
+                {% for subtipo in subtipos_baja_cuantia %}
+                  <option value="{{ subtipo.codigo }}" {% if subtipo_baja_actual == subtipo.codigo %}selected{% endif %}>
+                    {{ subtipo.nombre }}
                   </option>
                 {% endfor %}
               </select>

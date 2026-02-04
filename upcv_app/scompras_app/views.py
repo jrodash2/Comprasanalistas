@@ -50,6 +50,7 @@ from .models import (
     ProcesoCompraPaso,
     SolicitudPasoEstado,
     TipoProcesoCompra,
+    SubtipoProcesoCompra,
     Subproducto,
     UsuarioDepartamento,
     Institucion,
@@ -174,6 +175,39 @@ BAJA_CUANTIA_PASOS_POR_SUBTIPO = {
         'CIERRE DE EXPEDIENTE',
     ],
 }
+
+
+def obtener_subtipos_baja_cuantia():
+    tipo_baja = TipoProcesoCompra.objects.filter(codigo='baja-cuantia').first()
+    if tipo_baja:
+        subtipos = list(
+            SubtipoProcesoCompra.objects.filter(tipo=tipo_baja, activo=True).order_by('nombre')
+        )
+        if subtipos:
+            return [
+                {'codigo': subtipo.codigo, 'nombre': subtipo.nombre}
+                for subtipo in subtipos
+            ]
+    return [
+        {'codigo': codigo, 'nombre': nombre}
+        for codigo, nombre in SolicitudCompra.SUBTIPO_BAJA_CUANTIA_CHOICES
+    ]
+
+
+def obtener_subtipo_display(tipo_proceso, subtipo_codigo):
+    if not subtipo_codigo:
+        return ''
+    if tipo_proceso:
+        subtipo = SubtipoProcesoCompra.objects.filter(
+            tipo=tipo_proceso,
+            codigo=subtipo_codigo,
+        ).first()
+        if subtipo:
+            return subtipo.nombre
+    return dict(SolicitudCompra.SUBTIPO_BAJA_CUANTIA_CHOICES).get(
+        subtipo_codigo,
+        subtipo_codigo,
+    )
 
 
 def obtener_pasos_catalogo(solicitud):
@@ -992,10 +1026,22 @@ class SolicitudCompraDetailView(DetailView):
         context['paso_actual_num'] = solicitud.paso_actual
         context['analista_asignado'] = solicitud.analista_asignado
         context['es_analista_asignado'] = es_analista_asignado
-        context['puede_ver_timeline'] = (
-            (es_admin or es_scompras or es_presupuesto_usuario or es_analista_asignado)
-            and solicitud.tipo_proceso is not None
+        context['puede_ver_proceso_compra'] = (
+            es_admin or es_scompras or es_analista_asignado
         )
+        context['tipo_proceso_display'] = (
+            solicitud.tipo_proceso.nombre
+            if solicitud.tipo_proceso
+            else 'En análisis'
+        )
+        context['subtipo_baja_display'] = (
+            obtener_subtipo_display(solicitud.tipo_proceso, solicitud.subtipo_baja_cuantia)
+            if solicitud.tipo_proceso
+            and solicitud.tipo_proceso.codigo == 'baja-cuantia'
+            and solicitud.subtipo_baja_cuantia
+            else ''
+        )
+        context['mostrar_timeline'] = bool(solicitud.tipo_proceso) and bool(pasos_catalogo)
         context['puede_marcar_pasos'] = es_admin or es_analista_asignado
         context['es_admin_timeline'] = es_admin
         tipos_qs = TipoProcesoCompra.objects.filter(activo=True).order_by('orden', 'nombre')
@@ -1007,6 +1053,7 @@ class SolicitudCompraDetailView(DetailView):
         context['tipos_proceso_disponibles'] = tipos_qs
         context['tipo_proceso_actual'] = solicitud.tipo_proceso
         context['subtipo_baja_actual'] = solicitud.subtipo_baja_cuantia
+        context['subtipos_baja_cuantia'] = obtener_subtipos_baja_cuantia()
         if es_admin:
             context['lista_analistas'] = User.objects.filter(
                 groups__name__iexact='analista'
@@ -1064,9 +1111,14 @@ def asignar_tipo_proceso_solicitud(request, solicitud_id):
 
     subtipo_baja_cuantia = (request.POST.get('subtipo_baja_cuantia') or '').strip()
     if tipo_proceso.codigo == 'baja-cuantia':
-        subtipo_validos = {valor for valor, _ in SolicitudCompra.SUBTIPO_BAJA_CUANTIA_CHOICES}
-        if subtipo_baja_cuantia not in subtipo_validos:
-            return JsonResponse({"success": False, "error": "Subtipo de baja cuantía requerido"}, status=400)
+        subtipos_qs = SubtipoProcesoCompra.objects.filter(tipo=tipo_proceso, activo=True)
+        if subtipos_qs.exists():
+            if not subtipos_qs.filter(codigo=subtipo_baja_cuantia).exists():
+                return JsonResponse({"success": False, "error": "Subtipo de baja cuantía requerido"}, status=400)
+        else:
+            subtipo_validos = {valor for valor, _ in SolicitudCompra.SUBTIPO_BAJA_CUANTIA_CHOICES}
+            if subtipo_baja_cuantia not in subtipo_validos:
+                return JsonResponse({"success": False, "error": "Subtipo de baja cuantía requerido"}, status=400)
     else:
         subtipo_baja_cuantia = None
 
@@ -1093,7 +1145,9 @@ def asignar_tipo_proceso_solicitud(request, solicitud_id):
     return JsonResponse({
         "success": True,
         "tipo_proceso_display": tipo_proceso.nombre,
-        "subtipo_display": solicitud.get_subtipo_baja_cuantia_display() if subtipo_baja_cuantia else "",
+        "subtipo_display": obtener_subtipo_display(tipo_proceso, subtipo_baja_cuantia)
+        if subtipo_baja_cuantia
+        else "",
         "paso_actual": 1,
     })
 
@@ -1341,12 +1395,126 @@ def crear_tipo_proceso(request):
 
 @login_required
 @admin_only_config
+@require_POST
+def guardar_tipo_proceso(request):
+    if not is_admin(request.user):
+        return json_forbidden()
+    tipo_id = (request.POST.get('id') or '').strip()
+    nombre = (request.POST.get('nombre') or '').strip()
+    codigo_raw = (request.POST.get('codigo') or '').strip()
+    activo_raw = (request.POST.get('activo') or '').strip().lower()
+    activo = activo_raw in {'1', 'true', 'on', 'yes'}
+
+    if not nombre:
+        return JsonResponse({'success': False, 'error': 'El nombre es obligatorio.'}, status=400)
+    codigo = slugify(codigo_raw or nombre)
+    if not codigo:
+        return JsonResponse({'success': False, 'error': 'El código es obligatorio.'}, status=400)
+
+    tipo = None
+    if tipo_id:
+        tipo = get_object_or_404(TipoProcesoCompra, pk=tipo_id)
+
+    nombre_qs = TipoProcesoCompra.objects.filter(nombre__iexact=nombre)
+    codigo_qs = TipoProcesoCompra.objects.filter(codigo=codigo)
+    if tipo:
+        nombre_qs = nombre_qs.exclude(pk=tipo.id)
+        codigo_qs = codigo_qs.exclude(pk=tipo.id)
+    if nombre_qs.exists():
+        return JsonResponse({'success': False, 'error': 'Ya existe un tipo con ese nombre.'}, status=400)
+    if codigo_qs.exists():
+        return JsonResponse({'success': False, 'error': 'Ya existe un tipo con ese código.'}, status=400)
+
+    if not tipo:
+        tipo = TipoProcesoCompra.objects.create(
+            nombre=nombre,
+            codigo=codigo,
+            activo=activo,
+        )
+    else:
+        tipo.nombre = nombre
+        tipo.codigo = codigo
+        tipo.activo = activo
+        tipo.save(update_fields=['nombre', 'codigo', 'activo'])
+
+    return JsonResponse({
+        'success': True,
+        'tipo': {
+            'id': tipo.id,
+            'nombre': tipo.nombre,
+            'codigo': tipo.codigo,
+            'activo': tipo.activo,
+        },
+    })
+
+
+@login_required
+@admin_only_config
+@require_POST
+def guardar_subtipo_proceso(request):
+    if not is_admin(request.user):
+        return json_forbidden()
+    subtipo_id = (request.POST.get('id') or '').strip()
+    tipo_id = (request.POST.get('tipo_id') or '').strip()
+    nombre = (request.POST.get('nombre') or '').strip()
+    codigo_raw = (request.POST.get('codigo') or '').strip()
+    activo_raw = (request.POST.get('activo') or '').strip().lower()
+    activo = activo_raw in {'1', 'true', 'on', 'yes'}
+
+    if not tipo_id:
+        return JsonResponse({'success': False, 'error': 'El tipo es obligatorio.'}, status=400)
+    if not nombre:
+        return JsonResponse({'success': False, 'error': 'El nombre es obligatorio.'}, status=400)
+    tipo = get_object_or_404(TipoProcesoCompra, pk=tipo_id)
+    codigo = slugify(codigo_raw or nombre)
+    if not codigo:
+        return JsonResponse({'success': False, 'error': 'El código es obligatorio.'}, status=400)
+
+    subtipo = None
+    if subtipo_id:
+        subtipo = get_object_or_404(SubtipoProcesoCompra, pk=subtipo_id)
+
+    codigo_qs = SubtipoProcesoCompra.objects.filter(tipo=tipo, codigo=codigo)
+    if subtipo:
+        codigo_qs = codigo_qs.exclude(pk=subtipo.id)
+    if codigo_qs.exists():
+        return JsonResponse({'success': False, 'error': 'Ya existe un subtipo con ese código.'}, status=400)
+
+    if not subtipo:
+        subtipo = SubtipoProcesoCompra.objects.create(
+            tipo=tipo,
+            nombre=nombre,
+            codigo=codigo,
+            activo=activo,
+        )
+    else:
+        subtipo.tipo = tipo
+        subtipo.nombre = nombre
+        subtipo.codigo = codigo
+        subtipo.activo = activo
+        subtipo.save(update_fields=['tipo', 'nombre', 'codigo', 'activo'])
+
+    return JsonResponse({
+        'success': True,
+        'subtipo': {
+            'id': subtipo.id,
+            'tipo_id': subtipo.tipo_id,
+            'nombre': subtipo.nombre,
+            'codigo': subtipo.codigo,
+            'activo': subtipo.activo,
+        },
+    })
+
+
+@login_required
+@admin_only_config
 def pasos_tipo_proceso(request, tipo_id):
     tipo = get_object_or_404(TipoProcesoCompra, pk=tipo_id)
     pasos = tipo.pasos.order_by('numero')
     return render(request, 'scompras/procesos/pasos_tipo_proceso.html', {
         'tipo': tipo,
         'pasos': pasos,
+        'subtipos': tipo.subtipos.order_by('nombre'),
     })
 
 
