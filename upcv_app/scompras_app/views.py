@@ -992,10 +992,22 @@ class SolicitudCompraDetailView(DetailView):
         context['paso_actual_num'] = solicitud.paso_actual
         context['analista_asignado'] = solicitud.analista_asignado
         context['es_analista_asignado'] = es_analista_asignado
-        context['puede_ver_timeline'] = (
-            (es_admin or es_scompras or es_presupuesto_usuario or es_analista_asignado)
-            and solicitud.tipo_proceso is not None
+        context['puede_ver_proceso_compra'] = (
+            es_admin or es_scompras or es_analista_asignado
         )
+        context['tipo_proceso_display'] = (
+            solicitud.tipo_proceso.nombre
+            if solicitud.tipo_proceso
+            else 'Sin asignar'
+        )
+        context['subtipo_baja_display'] = (
+            solicitud.get_subtipo_baja_cuantia_display()
+            if solicitud.tipo_proceso
+            and solicitud.tipo_proceso.codigo == 'baja-cuantia'
+            and solicitud.subtipo_baja_cuantia
+            else ''
+        )
+        context['mostrar_timeline'] = bool(solicitud.tipo_proceso) and bool(pasos_catalogo)
         context['puede_marcar_pasos'] = es_admin or es_analista_asignado
         context['es_admin_timeline'] = es_admin
         tipos_qs = TipoProcesoCompra.objects.filter(activo=True).order_by('orden', 'nombre')
