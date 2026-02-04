@@ -35,6 +35,20 @@
                       {% endif %}
                     </td>
                     <td class="text-end">
+                      {% if es_admin or request.user.is_superuser %}
+                        <button
+                          class="btn btn-sm btn-outline-secondary btn-editar-tipo"
+                          data-id="{{ tipo.id }}"
+                          data-nombre="{{ tipo.nombre }}"
+                          data-codigo="{{ tipo.codigo }}"
+                          data-activo="{{ tipo.activo|yesno:'1,0' }}"
+                          type="button"
+                          data-bs-toggle="modal"
+                          data-bs-target="#modalTipoProceso"
+                        >
+                          Editar
+                        </button>
+                      {% endif %}
                       <a class="btn btn-sm btn-outline-primary" href="{% url 'scompras:pasos_tipo_proceso' tipo.id %}">
                         Administrar pasos
                       </a>
